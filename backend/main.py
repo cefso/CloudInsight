@@ -4,14 +4,17 @@ from contextlib import asynccontextmanager
 from config import get_settings
 from database import init_db
 from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig
-from routers import accounts, inspections, thresholds
+from routers import accounts, inspections, thresholds, cron
+from services.scheduler import task_scheduler
 
 settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    task_scheduler.start()
     yield
+    task_scheduler.stop()
 
 app = FastAPI(
     title=settings.app_name,
@@ -30,6 +33,7 @@ app.add_middleware(
 app.include_router(accounts.router)
 app.include_router(inspections.router)
 app.include_router(thresholds.router)
+app.include_router(cron.router)
 
 
 @app.get("/")
