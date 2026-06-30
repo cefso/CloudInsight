@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from config import get_settings
 from database import init_db
 from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig
-from routers import accounts, inspections, thresholds, cron
+from routers import accounts, inspections, thresholds, cron, dashboard
 from services.scheduler import task_scheduler
 
 settings = get_settings()
@@ -34,6 +34,7 @@ app.include_router(accounts.router)
 app.include_router(inspections.router)
 app.include_router(thresholds.router)
 app.include_router(cron.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/")
