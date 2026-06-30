@@ -1,9 +1,13 @@
 from typing import Optional
 from alibabacloud_cms20190101.client import Client as CmsClient
 from alibabacloud_slb20140515.client import Client as SlbClient
+from alibabacloud_ecs20140526.client import Client as EcsClient
+from alibabacloud_rds20140815.client import Client as RdsClient
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_cms20190101 import models as cms_models
 from alibabacloud_slb20140515 import models as slb_models
+from alibabacloud_ecs20140526 import models as ecs_models
+from alibabacloud_rds20140815 import models as rds_models
 import json
 from datetime import datetime, timedelta
 
@@ -17,7 +21,7 @@ class AliyunClient:
         },
         "acs_rds_dashboard": {
             "name": "RDS",
-            "metrics": ["CpuUsage", "MemoryUsage"],
+            "metrics": ["CpuUsage", "MemoryUsage", "DiskUsage"],
         },
     }
 
@@ -30,6 +34,8 @@ class AliyunClient:
         )
         self._client = CmsClient(config)
         self._slb_client = SlbClient(config)
+        self._ecs_client = EcsClient(config)
+        self._rds_client = RdsClient(config)
 
     def test_connection(self) -> dict:
         try:
@@ -66,26 +72,34 @@ class AliyunClient:
                         if "disk" in metric_name.lower():
                             filter_prefixes = ["/var/lib/container", "/var/lib/kubelet", "/var/lib/docker", "/run/container"]
                             device_values = {}
+                            has_diskname = False
+                            
                             for point in points:
                                 val = point.get("Average", point.get("Value"))
-                                diskname = point.get("diskname") or "unknown"
-                                if val is not None:
+                                diskname = point.get("diskname")
+                                
+                                if diskname:
+                                    has_diskname = True
                                     # diskname 可能是逗号分隔的多个路径
                                     disknames = [d.strip() for d in diskname.split(",")]
                                     for dn in disknames:
-                                        # 过滤容器相关挂载点
                                         if any(dn.startswith(prefix) for prefix in filter_prefixes):
                                             continue
-                                        # 只保留有意义的挂载点（/ 或以 / 开头的路径）
                                         if dn and dn.startswith("/"):
                                             device_values[dn] = float(val)
+                                elif val is not None:
+                                    # 没有 diskname 字段（如 RDS），直接返回值
+                                    return {"value": float(val), "disks": []}
                             
-                            if not device_values:
+                            if has_diskname and not device_values:
                                 return {"value": None, "disks": []}
                             
-                            disks = [{"device": d, "usage": v} for d, v in device_values.items()]
-                            max_value = max(device_values.values())
-                            return {"value": max_value, "disks": disks}
+                            if device_values:
+                                disks = [{"device": d, "usage": v} for d, v in device_values.items()]
+                                max_value = max(device_values.values())
+                                return {"value": max_value, "disks": disks}
+                            
+                            return {"value": None, "disks": []}
                         
                         # 其他指标返回最新值
                         val = points[-1].get("Average", points[-1].get("Value"))
@@ -138,7 +152,7 @@ class AliyunClient:
                                 seen.add(instance_id)
                                 resources.append({
                                     "instanceId": instance_id,
-                                    "instanceName": point.get("instanceName", instance_id),
+                                    "instanceName": instance_id,  # 先用 ID，后面会获取真实名称
                                 })
 
                     # 检查是否有下一页
@@ -148,10 +162,67 @@ class AliyunClient:
                 else:
                     break
 
+            # 如果是 ECS 或 RDS，获取真实实例名称
+            if resources:
+                if namespace == "acs_ecs_dashboard":
+                    self._fill_ecs_names(resources)
+                elif namespace == "acs_rds_dashboard":
+                    self._fill_rds_names(resources)
+
             return resources
         except Exception as e:
             print(f"列出资源失败: {e}")
             return []
+
+    def _fill_ecs_names(self, resources: list):
+        """填充 ECS 实例名称"""
+        try:
+            name_map = {}
+            next_token = None
+            
+            # 分页获取所有实例
+            while True:
+                request = ecs_models.DescribeInstancesRequest(
+                    region_id=self.region_id,
+                    max_results=100
+                )
+                if next_token:
+                    request.next_token = next_token
+                
+                response = self._ecs_client.describe_instances(request)
+                if response.status_code == 200 and response.body:
+                    instances = response.body.instances
+                    if instances and instances.instance:
+                        for inst in instances.instance:
+                            name_map[inst.instance_id] = inst.instance_name
+                    
+                    next_token = response.body.next_token
+                    if not next_token:
+                        break
+                else:
+                    break
+            
+            # 填充名称
+            for r in resources:
+                r["instanceName"] = name_map.get(r["instanceId"], r["instanceId"])
+        except Exception as e:
+            print(f"获取 ECS 实例名称失败: {e}")
+
+    def _fill_rds_names(self, resources: list):
+        """填充 RDS 实例名称"""
+        try:
+            request = rds_models.DescribeDBInstancesRequest(
+                region_id=self.region_id
+            )
+            response = self._rds_client.describe_dbinstances(request)
+            if response.status_code == 200 and response.body:
+                items = response.body.items
+                if items and items.dbinstance:
+                    name_map = {inst.dbinstance_id: inst.dbinstance_description for inst in items.dbinstance}
+                    for r in resources:
+                        r["instanceName"] = name_map.get(r["instanceId"], r["instanceId"])
+        except Exception as e:
+            print(f"获取 RDS 实例名称失败: {e}")
 
     def list_slb_instances(self) -> list:
         """获取所有 SLB 实例"""
