@@ -17,6 +17,6 @@ class InspectionResult(Base):
     memory_usage = Column(Float)
     disk_usage = Column(Float)
     disk_details = Column(Text)  # JSON 格式存储多个磁盘信息
-    is_abnormal = Column(Boolean, default=False)
+    status = Column(String(20), default="normal")  # normal / warning / abnormal
     abnormal_metrics = Column(Text)
     inspected_at = Column(DateTime, nullable=False)

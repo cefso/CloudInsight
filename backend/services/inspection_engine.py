@@ -12,15 +12,21 @@ class InspectionEngine:
     def __init__(self, db: Session):
         self.db = db
 
-    def run_inspection(self, account_ids: Optional[list[int]] = None, trigger_type: str = "manual") -> InspectionTask:
-        task = InspectionTask(
-            trigger_type=trigger_type,
-            status="running",
-            started_at=datetime.now()
-        )
-        self.db.add(task)
-        self.db.commit()
-        self.db.refresh(task)
+    def run_inspection(self, account_ids: Optional[list[int]] = None, trigger_type: str = "manual", task_id: Optional[int] = None) -> InspectionTask:
+        # 如果传入了 task_id，使用已有任务；否则创建新任务
+        if task_id:
+            task = self.db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
+            if not task:
+                raise ValueError(f"任务 {task_id} 不存在")
+        else:
+            task = InspectionTask(
+                trigger_type=trigger_type,
+                status="running",
+                started_at=datetime.now()
+            )
+            self.db.add(task)
+            self.db.commit()
+            self.db.refresh(task)
 
         try:
             if account_ids:
@@ -41,18 +47,24 @@ class InspectionEngine:
             cpu_threshold = threshold.cpu_threshold if threshold else 90.0
             memory_threshold = threshold.memory_threshold if threshold else 90.0
             disk_threshold = threshold.disk_threshold if threshold else 90.0
+            # 警告阈值 = 异常阈值 - 10%
+            cpu_warning = cpu_threshold - 10
+            memory_warning = memory_threshold - 10
+            disk_warning = disk_threshold - 10
 
-            total, normal, abnormal = 0, 0, 0
+            total, normal, warning, abnormal = 0, 0, 0, 0
             for account in accounts:
-                result = self._inspect_account(task.id, account, cpu_threshold, memory_threshold, disk_threshold)
+                result = self._inspect_account(task.id, account, cpu_threshold, memory_threshold, disk_threshold, cpu_warning, memory_warning, disk_warning)
                 total += result["total"]
                 normal += result["normal"]
+                warning += result["warning"]
                 abnormal += result["abnormal"]
 
             task.status = "completed"
             task.completed_at = datetime.now()
             task.total_resources = total
             task.normal_count = normal
+            task.warning_count = warning
             task.abnormal_count = abnormal
             self.db.commit()
 
@@ -65,13 +77,13 @@ class InspectionEngine:
 
         return task
 
-    def _inspect_account(self, task_id: int, account: CloudAccount, cpu_threshold: float, memory_threshold: float, disk_threshold: float) -> dict:
+    def _inspect_account(self, task_id: int, account: CloudAccount, cpu_threshold: float, memory_threshold: float, disk_threshold: float, cpu_warning: float, memory_warning: float, disk_warning: float) -> dict:
         ak = account.access_key_id
         sk = crypto_service.decrypt(account.access_key_secret)
         regions = json.loads(account.regions) if account.regions else ["cn-hangzhou"]
         resource_types = json.loads(account.resource_types) if account.resource_types else list(RESOURCE_TYPE_NAMES.keys())
 
-        total, normal, abnormal = 0, 0, 0
+        total, normal, warning, abnormal = 0, 0, 0, 0
 
         for region in regions:
             client = AliyunClient(ak, sk, region)
@@ -81,6 +93,7 @@ class InspectionEngine:
                     result = self._inspect_slb(task_id, account.id, client, region)
                     total += result["total"]
                     normal += result["normal"]
+                    warning += result.get("warning", 0)
                     abnormal += result["abnormal"]
                     continue
 
@@ -95,6 +108,7 @@ class InspectionEngine:
                     cpu_usage, memory_usage, disk_usage = None, None, None
                     disk_details = []
                     abnormal_metrics = []
+                    warning_metrics = []
 
                     metrics = AliyunClient.RESOURCE_METRICS.get(namespace, {})
                     for metric_name in metrics.get("metrics", []):
@@ -109,23 +123,37 @@ class InspectionEngine:
                         if value is not None:
                             if "cpu" in metric_name.lower():
                                 cpu_usage = value
-                                if value > cpu_threshold:
+                                if value >= cpu_threshold:
                                     abnormal_metrics.append("CPU 使用率")
+                                elif value >= cpu_warning:
+                                    warning_metrics.append("CPU 使用率")
                             elif "memory" in metric_name.lower():
                                 memory_usage = value
-                                if value > memory_threshold:
+                                if value >= memory_threshold:
                                     abnormal_metrics.append("内存使用率")
+                                elif value >= memory_warning:
+                                    warning_metrics.append("内存使用率")
                             elif "disk" in metric_name.lower():
                                 disk_usage = value
                                 disk_details = result_data.get("disks", [])
-                                if value > disk_threshold:
+                                if value >= disk_threshold:
                                     abnormal_metrics.append("磁盘使用率")
+                                elif value >= disk_warning:
+                                    warning_metrics.append("磁盘使用率")
 
-                    is_abnormal = len(abnormal_metrics) > 0
-                    if is_abnormal:
+                    # 确定状态
+                    if len(abnormal_metrics) > 0:
+                        status = "abnormal"
                         abnormal += 1
+                    elif len(warning_metrics) > 0:
+                        status = "warning"
+                        warning += 1
                     else:
+                        status = "normal"
                         normal += 1
+
+                    # 合并异常和警告指标
+                    all_metrics = abnormal_metrics + warning_metrics
 
                     result = InspectionResult(
                         task_id=task_id,
@@ -138,14 +166,14 @@ class InspectionEngine:
                         memory_usage=memory_usage,
                         disk_usage=disk_usage,
                         disk_details=json.dumps(disk_details) if disk_details else None,
-                        is_abnormal=is_abnormal,
-                        abnormal_metrics=json.dumps(abnormal_metrics) if abnormal_metrics else None,
+                        status=status,
+                        abnormal_metrics=json.dumps(all_metrics) if all_metrics else None,
                         inspected_at=datetime.now()
                     )
                     self.db.add(result)
 
         self.db.commit()
-        return {"total": total, "normal": normal, "abnormal": abnormal}
+        return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}
 
     def _inspect_slb(self, task_id: int, account_id: int, client: AliyunClient, region: str) -> dict:
         """SLB 巡检逻辑"""
@@ -162,6 +190,9 @@ class InspectionEngine:
             
             # 获取监听器
             listeners = client.get_slb_listeners(lb_id)
+            
+            # 获取后端服务器健康状态
+            health_servers = client.get_slb_health_status(lb_id)
             
             # 检查监听器状态
             abnormal_listeners = []
@@ -185,15 +216,36 @@ class InspectionEngine:
                 if status != "running":
                     abnormal_listeners.append(f"{protocol}:{port}({status})")
             
-            is_abnormal = len(abnormal_listeners) > 0 or lb_status != "active"
+            # 检查后端服务器健康状态
+            unhealthy_servers = []
+            server_details = []
             
-            if lb_status != "active":
-                abnormal_listeners.append(f"实例状态:{lb_status}")
+            for server in health_servers:
+                server_info = {
+                    "serverIp": server["serverIp"],
+                    "port": server["port"],
+                    "protocol": server["protocol"],
+                    "status": server["status"],
+                }
+                server_details.append(server_info)
+                
+                # 状态为 normal 才算正常
+                if server["status"] != "normal":
+                    unhealthy_servers.append(f"{server['serverIp']}:{server['port']}({server['status']})")
             
-            if is_abnormal:
+            # 确定状态
+            if len(abnormal_listeners) > 0 or len(unhealthy_servers) > 0 or lb_status != "active":
+                status = "abnormal"
                 abnormal += 1
             else:
+                status = "normal"
                 normal += 1
+            
+            # 将监听器和后端服务器信息合并存储
+            slb_details = {
+                "listeners": listener_details,
+                "backend_servers": server_details,
+            }
             
             result = InspectionResult(
                 task_id=task_id,
@@ -205,12 +257,12 @@ class InspectionEngine:
                 cpu_usage=None,
                 memory_usage=None,
                 disk_usage=None,
-                disk_details=json.dumps(listener_details) if listener_details else None,
-                is_abnormal=is_abnormal,
+                disk_details=json.dumps(slb_details),
+                status=status,
                 abnormal_metrics=json.dumps(abnormal_listeners) if abnormal_listeners else None,
                 inspected_at=datetime.now()
             )
             self.db.add(result)
         
         self.db.commit()
-        return {"total": total, "normal": normal, "abnormal": abnormal}
+        return {"total": total, "normal": normal, "warning": 0, "abnormal": abnormal}

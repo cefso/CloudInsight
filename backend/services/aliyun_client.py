@@ -163,7 +163,7 @@ class AliyunClient:
             response = self._slb_client.describe_load_balancers(request)
             if response.status_code == 200 and response.body:
                 load_balancers = response.body.load_balancers
-                if load_balancers:
+                if load_balancers and load_balancers.load_balancer:
                     return [
                         {
                             "loadBalancerId": lb.load_balancer_id,
@@ -172,7 +172,7 @@ class AliyunClient:
                             "address": lb.address,
                             "addressType": lb.address_type,
                         }
-                        for lb in load_balancers
+                        for lb in load_balancers.load_balancer
                     ]
             return []
         except Exception as e:
@@ -184,24 +184,53 @@ class AliyunClient:
         try:
             request = slb_models.DescribeLoadBalancerListenersRequest(
                 load_balancer_id=load_balancer_id,
+                region_id=self.region_id,
                 max_results=100
             )
             response = self._slb_client.describe_load_balancer_listeners(request)
             if response.status_code == 200 and response.body:
                 listeners = response.body.listeners
                 if listeners:
+                    # API 可能返回所有 SLB 的监听器，需要按 load_balancer_id 过滤
                     return [
                         {
-                            "listenerPort": listener.listener_port,
-                            "listenerProtocol": listener.listener_protocol,
-                            "status": listener.status,
-                            "description": listener.description or "",
+                            "listenerPort": l.listener_port,
+                            "listenerProtocol": l.listener_protocol,
+                            "status": l.status,
+                            "description": l.description or "",
                         }
-                        for listener in listeners
+                        for l in listeners
+                        if l.load_balancer_id == load_balancer_id
                     ]
             return []
         except Exception as e:
             print(f"获取 SLB 监听器失败: {e}")
+            return []
+
+    def get_slb_health_status(self, load_balancer_id: str) -> list:
+        """获取 SLB 后端服务器健康状态"""
+        try:
+            request = slb_models.DescribeHealthStatusRequest(
+                load_balancer_id=load_balancer_id,
+                region_id=self.region_id
+            )
+            response = self._slb_client.describe_health_status(request)
+            if response.status_code == 200 and response.body:
+                backend_servers = response.body.backend_servers
+                if backend_servers and backend_servers.backend_server:
+                    return [
+                        {
+                            "serverId": s.server_id,
+                            "serverIp": s.server_ip,
+                            "port": s.port,
+                            "protocol": s.protocol,
+                            "status": s.server_health_status,
+                        }
+                        for s in backend_servers.backend_server
+                    ]
+            return []
+        except Exception as e:
+            print(f"获取 SLB 健康状态失败: {e}")
             return []
 
 
