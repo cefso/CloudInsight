@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Breadcrumb, message } from 'antd';
+import { Card, Table, Tag, Button, message } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getInspectionTasks } from '../../api/inspections';
+import PageHeader from '../../components/PageHeader';
+import StatusTag from '../../components/StatusTag';
 
 export default function Inspections() {
   const navigate = useNavigate();
@@ -41,11 +43,7 @@ export default function Inspections() {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => {
-        const color = status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'processing';
-        const text = status === 'completed' ? '已完成' : status === 'failed' ? '失败' : '进行中';
-        return <Tag color={color}>{text}</Tag>;
-      },
+      render: (status: string) => <StatusTag status={status} />,
     },
     {
       title: '资源总数',
@@ -90,10 +88,10 @@ export default function Inspections() {
 
   return (
     <div>
-      <Breadcrumb items={[{ title: '巡检中心' }, { title: '巡检记录' }]} style={{ marginBottom: 16 }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>巡检记录</h1>
-      </div>
+      <PageHeader
+        breadcrumbs={[{ title: '巡检中心' }, { title: '巡检记录' }]}
+        title="巡检记录"
+      />
       <Card>
         <Table
           columns={columns}
