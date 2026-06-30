@@ -15,11 +15,12 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     account_count = db.query(CloudAccount).filter(CloudAccount.is_enabled == True).count()
     last_task = db.query(InspectionTask).filter(InspectionTask.status == "completed").order_by(desc(InspectionTask.completed_at)).first()
 
-    total_resources, normal_count, abnormal_count = 0, 0, 0
+    total_resources, normal_count, warning_count, abnormal_count = 0, 0, 0, 0
     last_inspection_time = None
     if last_task:
         total_resources = last_task.total_resources
         normal_count = last_task.normal_count
+        warning_count = last_task.warning_count
         abnormal_count = last_task.abnormal_count
         last_inspection_time = last_task.completed_at
 
@@ -28,6 +29,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     stats = DashboardStats(
         total_resources=total_resources,
         normal_count=normal_count,
+        warning_count=warning_count,
         abnormal_count=abnormal_count,
         account_count=account_count,
         last_inspection_time=last_inspection_time,
@@ -43,7 +45,7 @@ def get_abnormal_resources(limit: int = 10, db: Session = Depends(get_db)):
         return success_response(data=[])
 
     results = db.query(InspectionResult).filter(
-        InspectionResult.task_id == last_task.id, InspectionResult.is_abnormal == True
+        InspectionResult.task_id == last_task.id, InspectionResult.status.in_(["abnormal", "warning"])
     ).limit(limit).all()
 
     items = []

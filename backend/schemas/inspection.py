@@ -30,7 +30,7 @@ class InspectionResultResponse(BaseModel):
     cpu_usage: Optional[float] = None
     memory_usage: Optional[float] = None
     disk_usage: Optional[float] = None
-    is_abnormal: bool
+    status: str
     abnormal_metrics: Optional[list[str]] = None
     inspected_at: datetime
 
@@ -62,6 +62,7 @@ class CronConfigUpdate(BaseModel):
 class DashboardStats(BaseModel):
     total_resources: int = 0
     normal_count: int = 0
+    warning_count: int = 0
     abnormal_count: int = 0
     account_count: int = 0
     last_inspection_time: Optional[datetime] = None
