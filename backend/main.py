@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from config import get_settings
 from database import init_db
+from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig
 
 settings = get_settings()
 
