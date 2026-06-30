@@ -1,7 +1,9 @@
 from typing import Optional
 from alibabacloud_cms20190101.client import Client as CmsClient
+from alibabacloud_slb20140515.client import Client as SlbClient
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_cms20190101 import models as cms_models
+from alibabacloud_slb20140515 import models as slb_models
 import json
 from datetime import datetime, timedelta
 
@@ -17,10 +19,6 @@ class AliyunClient:
             "name": "RDS",
             "metrics": ["CpuUsage", "MemoryUsage"],
         },
-        "acs_oss_dashboard": {
-            "name": "OSS",
-            "metrics": ["InternetSend"],
-        },
     }
 
     def __init__(self, access_key_id: str, access_key_secret: str, region_id: str = "cn-hangzhou"):
@@ -31,6 +29,7 @@ class AliyunClient:
             region_id=region_id
         )
         self._client = CmsClient(config)
+        self._slb_client = SlbClient(config)
 
     def test_connection(self) -> dict:
         try:
@@ -154,10 +153,60 @@ class AliyunClient:
             print(f"列出资源失败: {e}")
             return []
 
+    def list_slb_instances(self) -> list:
+        """获取所有 SLB 实例"""
+        try:
+            request = slb_models.DescribeLoadBalancersRequest(
+                region_id=self.region_id,
+                page_size=100
+            )
+            response = self._slb_client.describe_load_balancers(request)
+            if response.status_code == 200 and response.body:
+                load_balancers = response.body.load_balancers
+                if load_balancers:
+                    return [
+                        {
+                            "loadBalancerId": lb.load_balancer_id,
+                            "loadBalancerName": lb.load_balancer_name or lb.load_balancer_id,
+                            "status": lb.load_balancer_status,
+                            "address": lb.address,
+                            "addressType": lb.address_type,
+                        }
+                        for lb in load_balancers
+                    ]
+            return []
+        except Exception as e:
+            print(f"获取 SLB 实例失败: {e}")
+            return []
+
+    def get_slb_listeners(self, load_balancer_id: str) -> list:
+        """获取 SLB 实例的所有监听器"""
+        try:
+            request = slb_models.DescribeLoadBalancerListenersRequest(
+                load_balancer_id=load_balancer_id,
+                max_results=100
+            )
+            response = self._slb_client.describe_load_balancer_listeners(request)
+            if response.status_code == 200 and response.body:
+                listeners = response.body.listeners
+                if listeners:
+                    return [
+                        {
+                            "listenerPort": listener.listener_port,
+                            "listenerProtocol": listener.listener_protocol,
+                            "status": listener.status,
+                            "description": listener.description or "",
+                        }
+                        for listener in listeners
+                    ]
+            return []
+        except Exception as e:
+            print(f"获取 SLB 监听器失败: {e}")
+            return []
+
 
 RESOURCE_TYPE_NAMES = {
     "acs_ecs_dashboard": "ECS",
     "acs_rds_dashboard": "RDS",
-    "acs_slb_dashboard": "SLB",
-    "acs_oss_dashboard": "OSS",
+    "slb": "SLB",
 }

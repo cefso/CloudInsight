@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Breadcrumb, message, Space, Statistic, Row, Col, Progress, Divider, Segmented } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FolderOutlined, FilterOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FolderOutlined, FilterOutlined, ApiOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
 import { getAccounts } from '../../../api/accounts';
@@ -9,13 +9,13 @@ import { getAccounts } from '../../../api/accounts';
 const RESOURCE_ICONS: Record<string, any> = {
   ECS: <CloudServerOutlined />,
   RDS: <DatabaseOutlined />,
-  OSS: <FolderOutlined />,
+  SLB: <ApiOutlined />,
 };
 
 const RESOURCE_COLORS: Record<string, string> = {
   ECS: '#3b82f6',
   RDS: '#8b5cf6',
-  OSS: '#f59e0b',
+  SLB: '#f59e0b',
 };
 
 export default function InspectionDetail() {
@@ -213,7 +213,32 @@ export default function InspectionDetail() {
         const icon = RESOURCE_ICONS[resourceType] || <CloudServerOutlined />;
         const color = RESOURCE_COLORS[resourceType] || '#3b82f6';
 
-        return (
+  // 渲染 SLB 监听器详情
+  const renderSlbListeners = (record: any) => {
+    const listeners = record.disk_details ? JSON.parse(record.disk_details) : [];
+    if (listeners.length === 0) {
+      return <span style={{ color: '#8c8c8c' }}>-</span>;
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {listeners.map((listener: any, idx: number) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontFamily: 'monospace' }}>
+              {listener.protocol}:{listener.port}
+            </span>
+            <Tag
+              color={listener.status === 'running' ? 'success' : 'error'}
+              style={{ margin: 0, fontSize: 11 }}
+            >
+              {listener.status}
+            </Tag>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
           <Card
             key={resourceType}
             style={{ marginBottom: 16 }}
@@ -254,9 +279,9 @@ export default function InspectionDetail() {
                 <div>资源名称</div>
                 <div>实例ID</div>
                 <div>账号 / 地域</div>
-                <div style={{ textAlign: 'center' }}>CPU</div>
-                <div style={{ textAlign: 'center' }}>内存</div>
-                <div style={{ textAlign: 'center' }}>磁盘</div>
+                <div style={{ textAlign: 'center' }}>{resourceType === 'SLB' ? '监听器' : 'CPU'}</div>
+                <div style={{ textAlign: 'center' }}>{resourceType === 'SLB' ? '' : '内存'}</div>
+                <div style={{ textAlign: 'center' }}>{resourceType === 'SLB' ? '' : '磁盘'}</div>
                 <div style={{ textAlign: 'center' }}>状态</div>
               </div>
               {/* 数据行 */}
@@ -278,9 +303,19 @@ export default function InspectionDetail() {
                     <Tag style={{ margin: 0 }}>{getAccountName(item.account_id)}</Tag>
                     <Tag style={{ margin: 0 }}>{item.region}</Tag>
                   </div>
-                  <div style={{ textAlign: 'center' }}>{renderMetric(item.cpu_usage)}</div>
-                  <div style={{ textAlign: 'center' }}>{renderMetric(item.memory_usage)}</div>
-                  <div style={{ textAlign: 'center' }}>{renderDiskDetails(item)}</div>
+                  {resourceType === 'SLB' ? (
+                    <>
+                      <div>{renderSlbListeners(item)}</div>
+                      <div></div>
+                      <div></div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ textAlign: 'center' }}>{renderMetric(item.cpu_usage)}</div>
+                      <div style={{ textAlign: 'center' }}>{renderMetric(item.memory_usage)}</div>
+                      <div style={{ textAlign: 'center' }}>{renderDiskDetails(item)}</div>
+                    </>
+                  )}
                   <div style={{ textAlign: 'center' }}>
                     <Tag color={item.is_abnormal ? 'error' : 'success'}>{item.is_abnormal ? '异常' : '正常'}</Tag>
                   </div>

@@ -76,7 +76,15 @@ class InspectionEngine:
         for region in regions:
             client = AliyunClient(ak, sk, region)
             for namespace in resource_types:
-                # 使用第一个指标来获取资源列表
+                # SLB 巡检逻辑（使用 SLB API）
+                if namespace == "slb":
+                    result = self._inspect_slb(task_id, account.id, client, region)
+                    total += result["total"]
+                    normal += result["normal"]
+                    abnormal += result["abnormal"]
+                    continue
+
+                # ECS/RDS 巡检逻辑（使用云监控 API）
                 metrics = AliyunClient.RESOURCE_METRICS.get(namespace, {})
                 metric_names = metrics.get("metrics", [])
                 if not metric_names:
@@ -136,5 +144,73 @@ class InspectionEngine:
                     )
                     self.db.add(result)
 
+        self.db.commit()
+        return {"total": total, "normal": normal, "abnormal": abnormal}
+
+    def _inspect_slb(self, task_id: int, account_id: int, client: AliyunClient, region: str) -> dict:
+        """SLB 巡检逻辑"""
+        total, normal, abnormal = 0, 0, 0
+        
+        # 获取所有 SLB 实例
+        slb_instances = client.list_slb_instances()
+        
+        for slb in slb_instances:
+            total += 1
+            lb_id = slb["loadBalancerId"]
+            lb_name = slb["loadBalancerName"]
+            lb_status = slb["status"]
+            
+            # 获取监听器
+            listeners = client.get_slb_listeners(lb_id)
+            
+            # 检查监听器状态
+            abnormal_listeners = []
+            listener_details = []
+            
+            for listener in listeners:
+                port = listener["listenerPort"]
+                protocol = listener["listenerProtocol"]
+                status = listener["status"]
+                desc = listener["description"]
+                
+                listener_info = {
+                    "port": port,
+                    "protocol": protocol,
+                    "status": status,
+                    "description": desc,
+                }
+                listener_details.append(listener_info)
+                
+                # 状态为 running 才算正常
+                if status != "running":
+                    abnormal_listeners.append(f"{protocol}:{port}({status})")
+            
+            is_abnormal = len(abnormal_listeners) > 0 or lb_status != "active"
+            
+            if lb_status != "active":
+                abnormal_listeners.append(f"实例状态:{lb_status}")
+            
+            if is_abnormal:
+                abnormal += 1
+            else:
+                normal += 1
+            
+            result = InspectionResult(
+                task_id=task_id,
+                account_id=account_id,
+                resource_type="SLB",
+                resource_id=lb_id,
+                resource_name=lb_name,
+                region=region,
+                cpu_usage=None,
+                memory_usage=None,
+                disk_usage=None,
+                disk_details=json.dumps(listener_details) if listener_details else None,
+                is_abnormal=is_abnormal,
+                abnormal_metrics=json.dumps(abnormal_listeners) if abnormal_listeners else None,
+                inspected_at=datetime.now()
+            )
+            self.db.add(result)
+        
         self.db.commit()
         return {"total": total, "normal": normal, "abnormal": abnormal}
