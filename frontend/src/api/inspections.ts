@@ -1,43 +1,75 @@
 import api from './index';
+import type {
+  InspectionTask,
+  InspectionResult,
+  PaginatedResponse,
+  AlertThreshold,
+  CronConfig,
+} from '../types';
 
-export async function getInspectionTasks(page = 1, pageSize = 20) {
-  const res = await api.get('/inspections/tasks', { params: { page, page_size: pageSize } });
-  return res.data;
+// ========== 巡检任务 ==========
+
+export async function getInspectionTasks(page = 1, pageSize = 20): Promise<PaginatedResponse<InspectionTask>> {
+  return await api.get('/inspections/tasks', { params: { page, page_size: pageSize } });
 }
 
-export async function getInspectionResults(params: any) {
-  const res = await api.get('/inspections/results', { params });
-  return res.data;
+export async function getInspectionResults(params: {
+  task_id?: number;
+  account_id?: number;
+  resource_type?: string;
+  status?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<PaginatedResponse<InspectionResult>> {
+  return await api.get('/inspections/results', { params });
 }
 
-export async function exportResults(taskId?: number, format = 'excel') {
-  const res = await api.get('/inspections/results/export', { params: { task_id: taskId, format }, responseType: 'blob' });
-  return res.data;
+export async function exportResults(taskId?: number, format = 'excel'): Promise<Blob> {
+  return await api.get('/inspections/results/export', {
+    params: { task_id: taskId, format },
+    responseType: 'blob',
+  }) as unknown as Blob;
 }
 
-export async function getThresholds() {
-  const res = await api.get('/thresholds');
-  return res.data;
+export async function triggerInspection(accountIds?: number[]): Promise<{ task_id: number }> {
+  return await api.post('/inspections/trigger', { account_ids: accountIds });
 }
 
-export async function updateThreshold(id: number, params: any) {
+// ========== 告警阈值 ==========
+
+export async function getThresholds(): Promise<AlertThreshold[]> {
+  return await api.get('/thresholds');
+}
+
+export async function updateThreshold(id: number, params: {
+  cpu_threshold?: number;
+  memory_threshold?: number;
+  disk_threshold?: number;
+}): Promise<void> {
   await api.put(`/thresholds/${id}`, params);
 }
 
-export async function getCronConfigs() {
-  const res = await api.get('/cron');
-  return res.data;
+// ========== 定时任务 ==========
+
+export async function getCronConfigs(): Promise<CronConfig[]> {
+  return await api.get('/cron');
 }
 
-export async function createCronConfig(params: any) {
-  const res = await api.post('/cron', params);
-  return res.data;
+export async function createCronConfig(params: {
+  name: string;
+  cron_expression: string;
+}): Promise<{ id: number }> {
+  return await api.post('/cron', params);
 }
 
-export async function updateCronConfig(id: number, params: any) {
+export async function updateCronConfig(id: number, params: {
+  name?: string;
+  cron_expression?: string;
+  is_enabled?: boolean;
+}): Promise<void> {
   await api.put(`/cron/${id}`, params);
 }
 
-export async function deleteCronConfig(id: number) {
+export async function deleteCronConfig(id: number): Promise<void> {
   await api.delete(`/cron/${id}`);
 }

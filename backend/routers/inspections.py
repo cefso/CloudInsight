@@ -53,6 +53,22 @@ def trigger_inspection(request: TriggerInspectionRequest, db: Session = Depends(
     
     return success_response(data={"task_id": task.id}, message="巡检任务已启动")
 
+def _serialize_task(task: InspectionTask) -> dict:
+    """序列化巡检任务"""
+    return {
+        "id": task.id,
+        "trigger_type": task.trigger_type,
+        "status": task.status,
+        "started_at": task.started_at,
+        "completed_at": task.completed_at,
+        "total_resources": task.total_resources,
+        "normal_count": task.normal_count,
+        "warning_count": task.warning_count,
+        "abnormal_count": task.abnormal_count,
+        "error_message": task.error_message,
+    }
+
+
 @router.get("/tasks")
 def list_tasks(
     page: int = Query(1, ge=1),
@@ -63,7 +79,7 @@ def list_tasks(
     tasks = db.query(InspectionTask).order_by(desc(InspectionTask.started_at)).offset((page - 1) * page_size).limit(page_size).all()
     pages = (total + page_size - 1) // page_size
     return success_response(data={
-        "items": [t.__dict__ for t in tasks],
+        "items": [_serialize_task(t) for t in tasks],
         "total": total, "page": page, "page_size": page_size, "pages": pages
     })
 
@@ -98,9 +114,22 @@ def list_results(
 
     items = []
     for r in results:
-        item = r.__dict__.copy()
-        if item.get("abnormal_metrics"):
-            item["abnormal_metrics"] = json.loads(item["abnormal_metrics"])
+        item = {
+            "id": r.id,
+            "task_id": r.task_id,
+            "account_id": r.account_id,
+            "resource_type": r.resource_type,
+            "resource_id": r.resource_id,
+            "resource_name": r.resource_name,
+            "region": r.region,
+            "cpu_usage": r.cpu_usage,
+            "memory_usage": r.memory_usage,
+            "disk_usage": r.disk_usage,
+            "disk_details": r.disk_details,
+            "status": r.status,
+            "abnormal_metrics": json.loads(r.abnormal_metrics) if r.abnormal_metrics else None,
+            "inspected_at": r.inspected_at,
+        }
         items.append(item)
 
     pages = (total + page_size - 1) // page_size

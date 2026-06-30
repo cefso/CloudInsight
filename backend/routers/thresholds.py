@@ -7,6 +7,20 @@ from utils.response import success_response
 
 router = APIRouter(prefix="/api/thresholds", tags=["阈值配置"])
 
+
+def _serialize_threshold(t: AlertThreshold) -> dict:
+    """序列化阈值配置"""
+    return {
+        "id": t.id,
+        "name": t.name,
+        "cpu_threshold": t.cpu_threshold,
+        "memory_threshold": t.memory_threshold,
+        "disk_threshold": t.disk_threshold,
+        "is_default": t.is_default,
+        "created_at": t.created_at,
+    }
+
+
 @router.get("")
 def list_thresholds(db: Session = Depends(get_db)):
     thresholds = db.query(AlertThreshold).order_by(AlertThreshold.created_at.desc()).all()
@@ -16,7 +30,8 @@ def list_thresholds(db: Session = Depends(get_db)):
         db.commit()
         db.refresh(default)
         thresholds = [default]
-    return success_response(data=[t.__dict__ for t in thresholds])
+    return success_response(data=[_serialize_threshold(t) for t in thresholds])
+
 
 @router.put("/{threshold_id}")
 def update_threshold(threshold_id: int, request: ThresholdUpdate, db: Session = Depends(get_db)):

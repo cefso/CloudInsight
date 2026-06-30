@@ -13,22 +13,24 @@ from services.aliyun_client import AliyunClient
 router = APIRouter(prefix="/api/accounts", tags=["账号管理"])
 
 
+def _serialize_account(account: CloudAccount) -> dict:
+    """序列化账号信息，脱敏 AK"""
+    return {
+        "id": account.id,
+        "name": account.name,
+        "access_key_id": crypto_service.mask_ak(account.access_key_id),
+        "regions": json.loads(account.regions) if account.regions else None,
+        "resource_types": json.loads(account.resource_types) if account.resource_types else None,
+        "is_enabled": account.is_enabled,
+        "created_at": account.created_at,
+        "updated_at": account.updated_at,
+    }
+
+
 @router.get("")
 def list_accounts(db: Session = Depends(get_db)):
     accounts = db.query(CloudAccount).order_by(CloudAccount.created_at.desc()).all()
-    result = []
-    for account in accounts:
-        result.append({
-            "id": account.id,
-            "name": account.name,
-            "access_key_id": crypto_service.mask_ak(account.access_key_id),
-            "regions": json.loads(account.regions) if account.regions else None,
-            "resource_types": json.loads(account.resource_types) if account.resource_types else None,
-            "is_enabled": account.is_enabled,
-            "created_at": account.created_at,
-            "updated_at": account.updated_at,
-        })
-    return success_response(data=result)
+    return success_response(data=[_serialize_account(a) for a in accounts])
 
 
 @router.post("")
@@ -52,16 +54,7 @@ def get_account(account_id: int, db: Session = Depends(get_db)):
     account = db.query(CloudAccount).filter(CloudAccount.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="账号不存在")
-    return success_response(data={
-        "id": account.id,
-        "name": account.name,
-        "access_key_id": crypto_service.mask_ak(account.access_key_id),
-        "regions": json.loads(account.regions) if account.regions else None,
-        "resource_types": json.loads(account.resource_types) if account.resource_types else None,
-        "is_enabled": account.is_enabled,
-        "created_at": account.created_at,
-        "updated_at": account.updated_at,
-    })
+    return success_response(data=_serialize_account(account))
 
 
 @router.put("/{account_id}")
@@ -71,10 +64,8 @@ def update_account(account_id: int, request: CloudAccountUpdate, db: Session = D
         raise HTTPException(status_code=404, detail="账号不存在")
     if request.name is not None:
         account.name = request.name
-    # 只有当 AK 不包含 *** 时才更新（避免覆盖脱敏值）
     if request.access_key_id is not None and "***" not in request.access_key_id:
         account.access_key_id = request.access_key_id
-    # 只有当 SK 不为空且不包含 *** 时才更新
     if request.access_key_secret is not None and "***" not in request.access_key_secret:
         account.access_key_secret = crypto_service.encrypt(request.access_key_secret)
     if request.regions is not None:
