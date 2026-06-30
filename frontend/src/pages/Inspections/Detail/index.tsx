@@ -90,10 +90,41 @@ export default function InspectionDetail() {
   // 按资源类型分组，SLB 拆分为监听器和后端服务器
   const groupedResults = results.reduce((acc: any, item: any) => {
     if (item.resource_type === 'SLB') {
+      // 判断监听器状态
+      const slbDetails = item.disk_details ? JSON.parse(item.disk_details) : {};
+      const listeners = slbDetails.listeners || [];
+      const hasListenerIssue = listeners.some((l: any) => l.status !== 'running');
+      const hasListenerWarning = listeners.some((l: any) => l.status === 'stopped');
+      const hasListenerAbnormal = listeners.some((l: any) => l.status !== 'running' && l.status !== 'stopped');
+      
+      // 判断后端服务器状态
+      const backendServers = slbDetails.backend_servers || [];
+      const hasBackendWarning = backendServers.some((s: any) => s.status === 'unavailable');
+      const hasBackendAbnormal = backendServers.some((s: any) => s.status === 'abnormal');
+      
+      // SLB 监听器卡片：只根据监听器状态
       if (!acc['SLB_Listener']) acc['SLB_Listener'] = [];
-      acc['SLB_Listener'].push(item);
+      const listenerItem = { ...item };
+      if (hasListenerAbnormal) {
+        listenerItem.status = 'abnormal';
+      } else if (hasListenerWarning) {
+        listenerItem.status = 'warning';
+      } else {
+        listenerItem.status = 'normal';
+      }
+      acc['SLB_Listener'].push(listenerItem);
+      
+      // SLB 后端服务器卡片：只根据后端服务器状态
       if (!acc['SLB_Backend']) acc['SLB_Backend'] = [];
-      acc['SLB_Backend'].push(item);
+      const backendItem = { ...item };
+      if (hasBackendAbnormal) {
+        backendItem.status = 'abnormal';
+      } else if (hasBackendWarning) {
+        backendItem.status = 'warning';
+      } else {
+        backendItem.status = 'normal';
+      }
+      acc['SLB_Backend'].push(backendItem);
     } else {
       const type = item.resource_type;
       if (!acc[type]) acc[type] = [];
