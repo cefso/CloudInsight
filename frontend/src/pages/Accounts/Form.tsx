@@ -13,7 +13,7 @@ const REGION_OPTIONS = [
 const RESOURCE_TYPE_OPTIONS = [
   { label: 'ECS（云服务器）', value: 'acs_ecs_dashboard' },
   { label: 'RDS（数据库）', value: 'acs_rds_dashboard' },
-  { label: 'OSS（对象存储）', value: 'acs_oss_dashboard' },
+  { label: 'SLB（负载均衡）', value: 'slb' },
 ];
 
 export default function AccountForm({ visible, onClose, onSuccess, initialValues }: any) {
