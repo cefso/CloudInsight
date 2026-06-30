@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from config import get_settings
 from database import init_db
 from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig
+from routers import accounts
 
 settings = get_settings()
 
@@ -25,6 +26,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(accounts.router)
+
 
 @app.get("/")
 async def root():
