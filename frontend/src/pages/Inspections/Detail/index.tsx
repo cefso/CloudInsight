@@ -259,6 +259,65 @@ export default function InspectionDetail() {
         </Card>
       )}
 
+      {/* 资源类型异常统计卡片 - 点击可跳转 */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {Object.entries(groupedResults).map(([resourceType, items]: [string, any]) => {
+          const stats = getResourceTypeStats(items);
+          const icon = RESOURCE_ICONS[resourceType] || <CloudServerOutlined />;
+          const color = RESOURCE_COLORS[resourceType] || '#3b82f6';
+          const label = RESOURCE_LABELS[resourceType] || `${resourceType} 资源`;
+          const hasAbnormal = stats.abnormal > 0 || stats.warning > 0;
+
+          return (
+            <Col key={resourceType} span={6}>
+              <Card
+                hoverable
+                onClick={() => {
+                  const el = document.getElementById(`resource-${resourceType}`);
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                style={{
+                  cursor: 'pointer',
+                  borderLeft: `4px solid ${hasAbnormal ? '#ef4444' : '#22c55e'}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 8,
+                    background: `${color}15`, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    color, fontSize: 18
+                  }}>{icon}</div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{label}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>总计</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{stats.total}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>正常</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{stats.normal}</div>
+                  </div>
+                  {stats.warning > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>警告</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#f59e0b' }}>{stats.warning}</div>
+                    </div>
+                  )}
+                  {stats.abnormal > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>异常</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#dc2626' }}>{stats.abnormal}</div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </Col>
+          );
+        })}
+      </Row>
+
       {Object.entries(groupedResults).map(([resourceType, items]: [string, any]) => {
         const filteredItems = getFilteredItems(items);
         if (filteredItems.length === 0) return null;
@@ -269,7 +328,7 @@ export default function InspectionDetail() {
         const isSlbType = resourceType === 'SLB_Listener' || resourceType === 'SLB_Backend';
 
         return (
-          <Card key={resourceType} style={{ marginBottom: 16 }}
+          <Card key={resourceType} id={`resource-${resourceType}`} style={{ marginBottom: 16, scrollMarginTop: 20 }}
             title={
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 8, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color, fontSize: 20 }}>{icon}</div>
