@@ -1,11 +1,14 @@
 import json
 import time
+import logging
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 from models import CloudAccount, InspectionTask, InspectionResult, AlertThreshold
 from services.crypto import crypto_service
 from services.aliyun_client import AliyunClient, RESOURCE_TYPE_NAMES
+
+logger = logging.getLogger(__name__)
 
 
 class InspectionEngine:

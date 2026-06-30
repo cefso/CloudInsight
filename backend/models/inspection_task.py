@@ -1,10 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, Index
 from sqlalchemy.sql import func
 from database import Base
 
 
 class InspectionTask(Base):
     __tablename__ = "inspection_tasks"
+    __table_args__ = (
+        Index("ix_task_status_completed", "status", "completed_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     trigger_type = Column(String(20), nullable=False, comment="触发类型: manual/cron")

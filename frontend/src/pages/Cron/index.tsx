@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Button, Space, Modal, Form, Input, Switch, message, Breadcrumb, Popconfirm } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, Switch, message, Breadcrumb, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getCronConfigs, createCronConfig, updateCronConfig, deleteCronConfig } from '../../api/inspections';
 

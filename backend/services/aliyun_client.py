@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 from alibabacloud_cms20190101.client import Client as CmsClient
 from alibabacloud_slb20140515.client import Client as SlbClient
 from alibabacloud_ecs20140526.client import Client as EcsClient
@@ -10,6 +11,8 @@ from alibabacloud_ecs20140526 import models as ecs_models
 from alibabacloud_rds20140815 import models as rds_models
 import json
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 
 class AliyunClient:
@@ -106,7 +109,7 @@ class AliyunClient:
                         return {"value": float(val) if val is not None else None, "disks": []}
             return {"value": None, "disks": []}
         except Exception as e:
-            print(f"获取指标失败: {e}")
+            logger.error(f"获取指标失败: {e}")
             return {"value": None, "disks": []}
 
     def list_resources(self, namespace: str, metric_name: str = None) -> list:
@@ -171,7 +174,7 @@ class AliyunClient:
 
             return resources
         except Exception as e:
-            print(f"列出资源失败: {e}")
+            logger.error(f"列出资源失败: {e}")
             return []
 
     def _fill_ecs_names(self, resources: list):
@@ -206,7 +209,7 @@ class AliyunClient:
             for r in resources:
                 r["instanceName"] = name_map.get(r["instanceId"], r["instanceId"])
         except Exception as e:
-            print(f"获取 ECS 实例名称失败: {e}")
+            logger.error(f"获取 ECS 实例名称失败: {e}")
 
     def _fill_rds_names(self, resources: list):
         """填充 RDS 实例名称"""
@@ -222,7 +225,7 @@ class AliyunClient:
                     for r in resources:
                         r["instanceName"] = name_map.get(r["instanceId"], r["instanceId"])
         except Exception as e:
-            print(f"获取 RDS 实例名称失败: {e}")
+            logger.error(f"获取 RDS 实例名称失败: {e}")
 
     def list_slb_instances(self) -> list:
         """获取所有 SLB 实例"""
@@ -247,7 +250,7 @@ class AliyunClient:
                     ]
             return []
         except Exception as e:
-            print(f"获取 SLB 实例失败: {e}")
+            logger.error(f"获取 SLB 实例失败: {e}")
             return []
 
     def get_slb_listeners(self, load_balancer_id: str) -> list:
@@ -275,7 +278,7 @@ class AliyunClient:
                     ]
             return []
         except Exception as e:
-            print(f"获取 SLB 监听器失败: {e}")
+            logger.error(f"获取 SLB 监听器失败: {e}")
             return []
 
     def get_slb_health_status(self, load_balancer_id: str) -> list:
@@ -301,7 +304,7 @@ class AliyunClient:
                     ]
             return []
         except Exception as e:
-            print(f"获取 SLB 健康状态失败: {e}")
+            logger.error(f"获取 SLB 健康状态失败: {e}")
             return []
 
 

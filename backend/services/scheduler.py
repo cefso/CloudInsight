@@ -1,9 +1,12 @@
+import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
 from database import SessionLocal
 from models import CronConfig
 from services.inspection_engine import InspectionEngine
+
+logger = logging.getLogger(__name__)
 
 
 class TaskScheduler:
@@ -64,7 +67,7 @@ class TaskScheduler:
             engine = InspectionEngine(db)
             engine.run_inspection(trigger_type="cron")
         except Exception as e:
-            print(f"定时巡检失败: {e}")
+            logger.error(f"定时巡检失败: {e}")
         finally:
             db.close()
 
