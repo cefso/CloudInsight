@@ -2,33 +2,24 @@ from typing import Optional
 from alibabacloud_cms20190101.client import Client as CmsClient
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_cms20190101 import models as cms_models
+import json
+from datetime import datetime, timedelta
 
 
 class AliyunClient:
+    # 阿里云云监控标准指标名称
     RESOURCE_METRICS = {
         "acs_ecs_dashboard": {
             "name": "ECS",
-            "metrics": ["CPUUtilization", "memory_usedutilization", "disk_usage"],
+            "metrics": ["CPUUtilization", "memory_usedutilization", "diskusage_utilization"],
         },
         "acs_rds_dashboard": {
             "name": "RDS",
-            "metrics": ["CPUUsage", "MemoryUsage", "DiskUsage"],
-        },
-        "acs_slb_dashboard": {
-            "name": "SLB",
-            "metrics": ["InstanceActiveConnection", "InstanceNewConnection"],
+            "metrics": ["CpuUsage", "MemoryUsage"],
         },
         "acs_oss_dashboard": {
             "name": "OSS",
-            "metrics": ["InternetSend", "InternetRecv"],
-        },
-        "acs_kvstore_dashboard": {
-            "name": "Redis",
-            "metrics": ["StandardCpuUsage", "StandardMemoryUsage"],
-        },
-        "acs_nat_gateway": {
-            "name": "NAT",
-            "metrics": ["SessionActiveConnectionCount"],
+            "metrics": ["InternetSend"],
         },
     }
 
@@ -57,41 +48,108 @@ class AliyunClient:
         metric_name: str,
         dimensions: list[dict],
         period: int = 60
-    ) -> Optional[float]:
+    ) -> dict:
+        """获取指标最新数据，返回 {value, disks} 结构"""
         try:
-            import json
-            request = cms_models.DescribeMetricDataRequest(
+            request = cms_models.DescribeMetricLastRequest(
                 namespace=namespace,
                 metric_name=metric_name,
                 dimensions=json.dumps(dimensions),
                 period=str(period)
             )
-            response = self._client.describe_metric_data(request)
+            response = self._client.describe_metric_last(request)
             if response.status_code == 200 and response.body:
                 datapoints = response.body.datapoints
                 if datapoints:
                     points = json.loads(datapoints)
                     if points:
-                        return points[-1].get("Average", points[-1].get("Value"))
-            return None
+                        # 对于磁盘指标，按 diskname 分组，过滤容器挂载点
+                        if "disk" in metric_name.lower():
+                            filter_prefixes = ["/var/lib/container", "/var/lib/kubelet", "/var/lib/docker", "/run/container"]
+                            device_values = {}
+                            for point in points:
+                                val = point.get("Average", point.get("Value"))
+                                diskname = point.get("diskname") or "unknown"
+                                if val is not None:
+                                    # diskname 可能是逗号分隔的多个路径
+                                    disknames = [d.strip() for d in diskname.split(",")]
+                                    for dn in disknames:
+                                        # 过滤容器相关挂载点
+                                        if any(dn.startswith(prefix) for prefix in filter_prefixes):
+                                            continue
+                                        # 只保留有意义的挂载点（/ 或以 / 开头的路径）
+                                        if dn and dn.startswith("/"):
+                                            device_values[dn] = float(val)
+                            
+                            if not device_values:
+                                return {"value": None, "disks": []}
+                            
+                            disks = [{"device": d, "usage": v} for d, v in device_values.items()]
+                            max_value = max(device_values.values())
+                            return {"value": max_value, "disks": disks}
+                        
+                        # 其他指标返回最新值
+                        val = points[-1].get("Average", points[-1].get("Value"))
+                        return {"value": float(val) if val is not None else None, "disks": []}
+            return {"value": None, "disks": []}
         except Exception as e:
             print(f"获取指标失败: {e}")
-            return None
+            return {"value": None, "disks": []}
 
-    def list_resources(self, namespace: str, page_number: int = 1, page_size: int = 50) -> list:
+    def list_resources(self, namespace: str, metric_name: str = None) -> list:
+        """通过指标数据获取资源列表，支持分页"""
         try:
-            request = cms_models.DescribeProjectMetaRequest(
-                namespace=namespace,
-                page_number=page_number,
-                page_size=page_size
-            )
-            response = self._client.describe_project_meta(request)
-            if response.status_code == 200 and response.body:
-                resources = response.body.resources
-                if resources:
-                    import json
-                    return json.loads(resources) if isinstance(resources, str) else resources
-            return []
+            # 使用第一个指标来获取资源列表
+            if not metric_name:
+                metrics = self.RESOURCE_METRICS.get(namespace, {}).get("metrics", [])
+                if not metrics:
+                    return []
+                metric_name = metrics[0]
+
+            # 获取最近 5 分钟的指标数据
+            now = datetime.utcnow()
+            start_time = (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            resources = []
+            seen = set()
+            next_token = None
+
+            while True:
+                request = cms_models.DescribeMetricListRequest(
+                    namespace=namespace,
+                    metric_name=metric_name,
+                    period="60",
+                    start_time=start_time,
+                    end_time=end_time,
+                    length=1000
+                )
+                if next_token:
+                    request.next_token = next_token
+
+                response = self._client.describe_metric_list(request)
+
+                if response.status_code == 200 and response.body:
+                    datapoints = response.body.datapoints
+                    if datapoints:
+                        points = json.loads(datapoints)
+                        for point in points:
+                            instance_id = point.get("instanceId", "")
+                            if instance_id and instance_id not in seen:
+                                seen.add(instance_id)
+                                resources.append({
+                                    "instanceId": instance_id,
+                                    "instanceName": point.get("instanceName", instance_id),
+                                })
+
+                    # 检查是否有下一页
+                    next_token = response.body.next_token
+                    if not next_token or not datapoints:
+                        break
+                else:
+                    break
+
+            return resources
         except Exception as e:
             print(f"列出资源失败: {e}")
             return []
@@ -102,6 +160,4 @@ RESOURCE_TYPE_NAMES = {
     "acs_rds_dashboard": "RDS",
     "acs_slb_dashboard": "SLB",
     "acs_oss_dashboard": "OSS",
-    "acs_kvstore_dashboard": "Redis",
-    "acs_nat_gateway": "NAT",
 }

@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -75,19 +76,28 @@ class InspectionEngine:
         for region in regions:
             client = AliyunClient(ak, sk, region)
             for namespace in resource_types:
-                resources = client.list_resources(namespace)
+                # 使用第一个指标来获取资源列表
+                metrics = AliyunClient.RESOURCE_METRICS.get(namespace, {})
+                metric_names = metrics.get("metrics", [])
+                if not metric_names:
+                    continue
+                resources = client.list_resources(namespace, metric_names[0])
                 for resource in resources:
                     total += 1
                     cpu_usage, memory_usage, disk_usage = None, None, None
+                    disk_details = []
                     abnormal_metrics = []
 
                     metrics = AliyunClient.RESOURCE_METRICS.get(namespace, {})
                     for metric_name in metrics.get("metrics", []):
-                        value = client.get_metric_data(
+                        # 添加延迟避免触发限流
+                        time.sleep(0.2)
+                        result_data = client.get_metric_data(
                             namespace=namespace,
                             metric_name=metric_name,
                             dimensions=[{"instanceId": resource.get("instanceId", "")}]
                         )
+                        value = result_data.get("value")
                         if value is not None:
                             if "cpu" in metric_name.lower():
                                 cpu_usage = value
@@ -99,6 +109,7 @@ class InspectionEngine:
                                     abnormal_metrics.append("内存使用率")
                             elif "disk" in metric_name.lower():
                                 disk_usage = value
+                                disk_details = result_data.get("disks", [])
                                 if value > disk_threshold:
                                     abnormal_metrics.append("磁盘使用率")
 
@@ -118,6 +129,7 @@ class InspectionEngine:
                         cpu_usage=cpu_usage,
                         memory_usage=memory_usage,
                         disk_usage=disk_usage,
+                        disk_details=json.dumps(disk_details) if disk_details else None,
                         is_abnormal=is_abnormal,
                         abnormal_metrics=json.dumps(abnormal_metrics) if abnormal_metrics else None,
                         inspected_at=datetime.now()

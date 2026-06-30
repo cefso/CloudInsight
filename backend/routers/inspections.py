@@ -37,6 +37,7 @@ def list_tasks(
 @router.get("/results")
 def list_results(
     task_id: Optional[int] = None,
+    account_id: Optional[int] = None,
     resource_type: Optional[str] = None,
     is_abnormal: Optional[bool] = None,
     page: int = Query(1, ge=1),
@@ -46,6 +47,8 @@ def list_results(
     query = db.query(InspectionResult)
     if task_id is not None:
         query = query.filter(InspectionResult.task_id == task_id)
+    if account_id is not None:
+        query = query.filter(InspectionResult.account_id == account_id)
     if resource_type is not None:
         query = query.filter(InspectionResult.resource_type == resource_type)
     if is_abnormal is not None:

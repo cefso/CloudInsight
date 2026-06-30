@@ -31,7 +31,7 @@ export async function getAbnormalResources(limit = 10): Promise<AbnormalResource
   return res.data;
 }
 
-export async function triggerInspection(): Promise<{ task_id: number }> {
-  const res = await api.post('/inspections/trigger', {});
+export async function triggerInspection(accountIds?: number[]): Promise<{ task_id: number }> {
+  const res = await api.post('/inspections/trigger', { account_ids: accountIds });
   return res.data;
 }
