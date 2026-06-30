@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Card, Table, Button, Tag, Space, message, Popconfirm, Breadcrumb } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ApiOutlined } from '@ant-design/icons';
-import { getAccounts, deleteAccount, testConnection, CloudAccount } from '../../api/accounts';
+import { getAccounts, deleteAccount, testConnection } from '../../api/accounts';
+import type { CloudAccount } from '../../api/accounts';
 import AccountForm from './Form';
 
 export default function Accounts() {

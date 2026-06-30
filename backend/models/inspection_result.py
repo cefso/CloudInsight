@@ -16,6 +16,7 @@ class InspectionResult(Base):
     cpu_usage = Column(Float)
     memory_usage = Column(Float)
     disk_usage = Column(Float)
+    disk_details = Column(Text)  # JSON 格式存储多个磁盘信息
     is_abnormal = Column(Boolean, default=False)
     abnormal_metrics = Column(Text)
     inspected_at = Column(DateTime, nullable=False)
