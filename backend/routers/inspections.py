@@ -70,6 +70,7 @@ def list_results(
     account_id: Optional[int] = None,
     resource_type: Optional[str] = None,
     is_abnormal: Optional[bool] = None,
+    status: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
@@ -82,7 +83,12 @@ def list_results(
     if resource_type is not None:
         query = query.filter(InspectionResult.resource_type == resource_type)
     if is_abnormal is not None:
-        query = query.filter(InspectionResult.is_abnormal == is_abnormal)
+        if is_abnormal:
+            query = query.filter(InspectionResult.status.in_(["abnormal", "warning"]))
+        else:
+            query = query.filter(InspectionResult.status == "normal")
+    if status is not None:
+        query = query.filter(InspectionResult.status == status)
 
     total = query.count()
     results = query.order_by(desc(InspectionResult.inspected_at)).offset((page - 1) * page_size).limit(page_size).all()
@@ -117,7 +123,7 @@ def export_results(task_id: Optional[int] = None, format: str = Query("excel"), 
                 f"{r.cpu_usage:.1f}%" if r.cpu_usage else "-",
                 f"{r.memory_usage:.1f}%" if r.memory_usage else "-",
                 f"{r.disk_usage:.1f}%" if r.disk_usage else "-",
-                "是" if r.is_abnormal else "否",
+                "是" if r.status in ["abnormal", "warning"] else "否",
                 ", ".join(am) if am else "-",
                 r.inspected_at.strftime("%Y-%m-%d %H:%M:%S")
             ])
