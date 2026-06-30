@@ -1,10 +1,15 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Index
 from sqlalchemy.sql import func
 from database import Base
 
 
 class InspectionResult(Base):
     __tablename__ = "inspection_results"
+    __table_args__ = (
+        Index("ix_result_task_id", "task_id"),
+        Index("ix_result_status", "status"),
+        Index("ix_result_account_id", "account_id"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     task_id = Column(Integer, ForeignKey("inspection_tasks.id"), nullable=False)

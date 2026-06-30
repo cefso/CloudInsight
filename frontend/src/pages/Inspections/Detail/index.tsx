@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Breadcrumb, message, Space, Statistic, Row, Col, Progress, Segmented } from 'antd';
+import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented } from 'antd';
 import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
@@ -27,13 +27,19 @@ const RESOURCE_LABELS: Record<string, string> = {
   SLB_Backend: 'SLB 后端服务器',
 };
 
+function safeParseJSON(str: string | null, fallback: any = []): any {
+  if (!str) return fallback;
+  try { return JSON.parse(str); }
+  catch { return fallback; }
+}
+
 export default function InspectionDetail() {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const [results, setResults] = useState<any[]>([]);
   const [task, setTask] = useState<any>(null);
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [showMode, setShowMode] = useState<'all' | 'warning' | 'abnormal'>('abnormal');
 
   const fetchTask = async () => {
@@ -57,7 +63,8 @@ export default function InspectionDetail() {
       let allResults: any[] = [];
       let page = 1;
       let hasMore = true;
-      while (hasMore) {
+      const MAX_PAGES = 50;
+      while (hasMore && page <= MAX_PAGES) {
         const data = await getInspectionResults({ task_id: Number(taskId), page_size: 100, page });
         const items = data.items || [];
         allResults = [...allResults, ...items];
@@ -79,6 +86,7 @@ export default function InspectionDetail() {
       a.href = url;
       a.download = `inspection_${taskId}_${dayjs().format('YYYYMMDDHHmmss')}.xlsx`;
       a.click();
+      window.URL.revokeObjectURL(url);
     } catch { message.error('导出失败'); }
   };
 
@@ -91,9 +99,8 @@ export default function InspectionDetail() {
   const groupedResults = results.reduce((acc: any, item: any) => {
     if (item.resource_type === 'SLB') {
       // 判断监听器状态
-      const slbDetails = item.disk_details ? JSON.parse(item.disk_details) : {};
+      const slbDetails = safeParseJSON(item.disk_details, {});
       const listeners = slbDetails.listeners || [];
-      const hasListenerIssue = listeners.some((l: any) => l.status !== 'running');
       const hasListenerWarning = listeners.some((l: any) => l.status === 'stopped');
       const hasListenerAbnormal = listeners.some((l: any) => l.status !== 'running' && l.status !== 'stopped');
       
@@ -153,7 +160,7 @@ export default function InspectionDetail() {
   };
 
   const renderDiskDetails = (record: any) => {
-    let diskDetails = record.disk_details ? JSON.parse(record.disk_details) : [];
+    let diskDetails = safeParseJSON(record.disk_details, []);
     const filterPrefixes = ['/var/lib/container', '/var/lib/kubelet', '/var/lib/docker', '/run/container'];
     const expandedDisks: any[] = [];
     for (const disk of diskDetails) {
@@ -177,7 +184,7 @@ export default function InspectionDetail() {
   };
 
   const renderSlbListenerItems = (record: any) => {
-    let slbDetails = record.disk_details ? JSON.parse(record.disk_details) : {};
+    let slbDetails = safeParseJSON(record.disk_details, {});
     let listeners = slbDetails.listeners || [];
     // 异常或警告模式下，隐藏 running 状态的监听器
     if (showMode === 'abnormal' || showMode === 'warning') {
@@ -199,7 +206,7 @@ export default function InspectionDetail() {
   };
 
   const renderSlbBackendItems = (record: any) => {
-    let slbDetails = record.disk_details ? JSON.parse(record.disk_details) : {};
+    let slbDetails = safeParseJSON(record.disk_details, {});
     let backendServers = slbDetails.backend_servers || [];
     // 异常或警告模式下，隐藏 normal 状态的后端服务器
     if (showMode === 'abnormal' || showMode === 'warning') {
@@ -288,7 +295,7 @@ export default function InspectionDetail() {
                 {!isSlbType && <div style={{ textAlign: 'center' }}>磁盘</div>}
                 <div style={{ textAlign: 'center' }}>状态</div>
               </div>
-              {filteredItems.map((item: any, idx: number) => (
+              {filteredItems.map((item: any) => (
                 <div key={item.id} style={{
                   display: 'grid', gridTemplateColumns: isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr',
                   gap: 16, padding: '12px 16px',

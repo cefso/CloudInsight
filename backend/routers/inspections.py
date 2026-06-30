@@ -1,5 +1,6 @@
 import json
 import io
+import logging
 import threading
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,6 +14,8 @@ from schemas.inspection import TriggerInspectionRequest
 from utils.response import success_response
 from services.inspection_engine import InspectionEngine
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/inspections", tags=["巡检任务"])
 
 
@@ -23,7 +26,7 @@ def _run_inspection_background(account_ids, trigger_type, task_id):
         engine = InspectionEngine(db)
         engine.run_inspection(account_ids=account_ids, trigger_type=trigger_type, task_id=task_id)
     except Exception as e:
-        print(f"巡检任务执行失败: {e}")
+        logger.error(f"巡检任务执行失败: {e}")
     finally:
         db.close()
 
@@ -104,13 +107,13 @@ def list_results(
     return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size, "pages": pages})
 
 @router.get("/results/export")
-def export_results(task_id: Optional[int] = None, format: str = Query("excel"), db: Session = Depends(get_db)):
+def export_results(task_id: Optional[int] = None, output_format: str = Query("excel", alias="format"), db: Session = Depends(get_db)):
     query = db.query(InspectionResult)
     if task_id is not None:
         query = query.filter(InspectionResult.task_id == task_id)
     results = query.order_by(desc(InspectionResult.inspected_at)).all()
 
-    if format == "excel":
+    if output_format == "excel":
         import openpyxl
         wb = openpyxl.Workbook()
         ws = wb.active

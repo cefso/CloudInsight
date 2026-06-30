@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Breadcrumb, message, Space, Statistic } from 'antd';
-import { EyeOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Button, Breadcrumb, message } from 'antd';
+import { EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getInspectionTasks } from '../../api/inspections';

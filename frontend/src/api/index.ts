@@ -7,6 +7,10 @@ const api = axios.create({
 
 api.interceptors.response.use(
   (response) => {
+    // blob 响应直接返回，不走 JSON 解析
+    if (response.config.responseType === 'blob') {
+      return response.data;
+    }
     const { data } = response;
     if (data.code !== 200) {
       return Promise.reject(new Error(data.message || '请求失败'));

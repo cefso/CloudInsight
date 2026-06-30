@@ -1,11 +1,20 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+import logging
 from config import get_settings
 from database import init_db
 from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig
 from routers import accounts, inspections, thresholds, cron, dashboard
 from services.scheduler import task_scheduler
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -21,6 +30,20 @@ app = FastAPI(
     version=settings.app_version,
     lifespan=lifespan
 )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"code": exc.status_code, "message": exc.detail, "data": None}
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"code": 500, "message": str(exc), "data": None}
+    )
 
 app.add_middleware(
     CORSMiddleware,
