@@ -177,7 +177,7 @@ class InspectionEngine:
 
     def _inspect_slb(self, task_id: int, account_id: int, client: AliyunClient, region: str) -> dict:
         """SLB 巡检逻辑"""
-        total, normal, abnormal = 0, 0, 0
+        total, normal, warning, abnormal = 0, 0, 0, 0
         
         # 获取所有 SLB 实例
         slb_instances = client.list_slb_instances()
@@ -195,6 +195,7 @@ class InspectionEngine:
             health_servers = client.get_slb_health_status(lb_id)
             
             # 检查监听器状态
+            warning_listeners = []
             abnormal_listeners = []
             listener_details = []
             
@@ -212,12 +213,15 @@ class InspectionEngine:
                 }
                 listener_details.append(listener_info)
                 
-                # 状态为 running 才算正常
-                if status != "running":
+                # stopped 为警告，其他非 running 状态为异常
+                if status == "stopped":
+                    warning_listeners.append(f"{protocol}:{port}({status})")
+                elif status != "running":
                     abnormal_listeners.append(f"{protocol}:{port}({status})")
             
             # 检查后端服务器健康状态
-            unhealthy_servers = []
+            warning_servers = []
+            abnormal_servers = []
             server_details = []
             
             for server in health_servers:
@@ -229,14 +233,25 @@ class InspectionEngine:
                 }
                 server_details.append(server_info)
                 
-                # 状态为 normal 才算正常
-                if server["status"] != "normal":
-                    unhealthy_servers.append(f"{server['serverIp']}:{server['port']}({server['status']})")
+                # unavailable 为警告，abnormal 为异常
+                if server["status"] == "unavailable":
+                    warning_servers.append(f"{server['serverIp']}:{server['port']}({server['status']})")
+                elif server["status"] == "abnormal":
+                    abnormal_servers.append(f"{server['serverIp']}:{server['port']}({server['status']})")
             
-            # 确定状态
-            if len(abnormal_listeners) > 0 or len(unhealthy_servers) > 0 or lb_status != "active":
+            # 确定状态：异常 > 警告 > 正常
+            all_issues = abnormal_listeners + abnormal_servers
+            all_warnings = warning_listeners + warning_servers
+            
+            if lb_status != "active":
+                all_issues.append(f"实例状态:{lb_status}")
+            
+            if len(all_issues) > 0:
                 status = "abnormal"
                 abnormal += 1
+            elif len(all_warnings) > 0:
+                status = "warning"
+                warning += 1
             else:
                 status = "normal"
                 normal += 1
@@ -246,6 +261,9 @@ class InspectionEngine:
                 "listeners": listener_details,
                 "backend_servers": server_details,
             }
+            
+            # 合并所有问题指标
+            all_metrics = all_issues + all_warnings
             
             result = InspectionResult(
                 task_id=task_id,
@@ -259,10 +277,10 @@ class InspectionEngine:
                 disk_usage=None,
                 disk_details=json.dumps(slb_details),
                 status=status,
-                abnormal_metrics=json.dumps(abnormal_listeners) if abnormal_listeners else None,
+                abnormal_metrics=json.dumps(all_metrics) if all_metrics else None,
                 inspected_at=datetime.now()
             )
             self.db.add(result)
         
         self.db.commit()
-        return {"total": total, "normal": normal, "warning": 0, "abnormal": abnormal}
+        return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}

@@ -34,7 +34,7 @@ export default function InspectionDetail() {
   const [task, setTask] = useState<any>(null);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showMode, setShowMode] = useState<'all' | 'abnormal'>('abnormal');
+  const [showMode, setShowMode] = useState<'all' | 'warning' | 'abnormal'>('abnormal');
 
   const fetchTask = async () => {
     try {
@@ -103,7 +103,8 @@ export default function InspectionDetail() {
   }, {});
 
   const getFilteredItems = (items: any[]) => {
-    if (showMode === 'abnormal') return items.filter(i => i.status === 'abnormal' || i.status === 'warning');
+    if (showMode === 'abnormal') return items.filter(i => i.status === 'abnormal');
+    if (showMode === 'warning') return items.filter(i => i.status === 'abnormal' || i.status === 'warning');
     return items;
   };
 
@@ -147,14 +148,19 @@ export default function InspectionDetail() {
   const renderSlbListenerItems = (record: any) => {
     let slbDetails = record.disk_details ? JSON.parse(record.disk_details) : {};
     let listeners = slbDetails.listeners || [];
-    if (showMode === 'abnormal') listeners = listeners.filter((l: any) => l.status !== 'running');
+    // 异常或警告模式下，隐藏 running 状态的监听器
+    if (showMode === 'abnormal' || showMode === 'warning') {
+      listeners = listeners.filter((l: any) => l.status !== 'running');
+    }
     if (listeners.length === 0) return <span style={{ color: '#8c8c8c' }}>-</span>;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {listeners.map((listener: any, idx: number) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{listener.protocol}:{listener.port}</span>
-            <Tag color={listener.status === 'running' ? 'success' : 'error'} style={{ margin: 0, fontSize: 11 }}>{listener.status}</Tag>
+            <Tag color={listener.status === 'running' ? 'success' : listener.status === 'stopped' ? 'warning' : 'error'} style={{ margin: 0, fontSize: 11 }}>
+              {listener.status}
+            </Tag>
           </div>
         ))}
       </div>
@@ -164,14 +170,19 @@ export default function InspectionDetail() {
   const renderSlbBackendItems = (record: any) => {
     let slbDetails = record.disk_details ? JSON.parse(record.disk_details) : {};
     let backendServers = slbDetails.backend_servers || [];
-    if (showMode === 'abnormal') backendServers = backendServers.filter((s: any) => s.status !== 'normal');
+    // 异常或警告模式下，隐藏 normal 状态的后端服务器
+    if (showMode === 'abnormal' || showMode === 'warning') {
+      backendServers = backendServers.filter((s: any) => s.status !== 'normal');
+    }
     if (backendServers.length === 0) return <span style={{ color: '#8c8c8c' }}>-</span>;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {backendServers.map((server: any, idx: number) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{server.serverIp}:{server.port}</span>
-            <Tag color={server.status === 'normal' ? 'success' : 'error'} style={{ margin: 0, fontSize: 11 }}>{server.status}</Tag>
+            <Tag color={server.status === 'normal' ? 'success' : server.status === 'unavailable' ? 'warning' : 'error'} style={{ margin: 0, fontSize: 11 }}>
+              {server.status}
+            </Tag>
           </div>
         ))}
       </div>
@@ -187,7 +198,11 @@ export default function InspectionDetail() {
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>巡检报告 #{taskId}</h1>
         </Space>
         <Space>
-          <Segmented value={showMode} onChange={(v) => setShowMode(v as 'all' | 'abnormal')} options={[{ label: '仅异常', value: 'abnormal', icon: <WarningOutlined /> }, { label: '全部', value: 'all', icon: <FilterOutlined /> }]} />
+          <Segmented value={showMode} onChange={(v) => setShowMode(v as 'all' | 'warning' | 'abnormal')} options={[
+            { label: '仅异常', value: 'abnormal', icon: <WarningOutlined /> },
+            { label: '异常+警告', value: 'warning' },
+            { label: '全部', value: 'all', icon: <FilterOutlined /> }
+          ]} />
           <Button icon={<DownloadOutlined />} onClick={handleExport}>导出 Excel</Button>
         </Space>
       </div>
