@@ -15,7 +15,7 @@ api.interceptors.response.use(
     if (data.code !== 200) {
       return Promise.reject(new Error(data.message || '请求失败'));
     }
-    return data;
+    return data.data;
   },
   (error) => Promise.reject(error)
 );

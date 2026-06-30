@@ -34,6 +34,19 @@ export default function Inspections() {
       render: (id: number) => <Tag color="blue">#{id}</Tag>,
     },
     {
+      title: '巡检账号',
+      dataIndex: 'account_names',
+      key: 'accounts',
+      render: (names: string[]) => {
+        if (!names || names.length === 0) return <span style={{ color: '#8c8c8c' }}>-</span>;
+        return (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {names.map((name, idx) => <Tag key={idx}>{name}</Tag>)}
+          </div>
+        );
+      },
+    },
+    {
       title: '触发方式',
       dataIndex: 'trigger_type',
       key: 'trigger_type',

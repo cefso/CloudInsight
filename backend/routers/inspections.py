@@ -6,10 +6,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from typing import Optional
 from database import get_db, SessionLocal
-from models import InspectionTask, InspectionResult
+from models import InspectionTask, InspectionResult, CloudAccount
 from schemas.inspection import TriggerInspectionRequest
 from utils.response import success_response
 from services.inspection_engine import InspectionEngine
@@ -53,7 +53,7 @@ def trigger_inspection(request: TriggerInspectionRequest, db: Session = Depends(
     
     return success_response(data={"task_id": task.id}, message="巡检任务已启动")
 
-def _serialize_task(task: InspectionTask) -> dict:
+def _serialize_task(task: InspectionTask, account_names: list[str] = None) -> dict:
     """序列化巡检任务"""
     return {
         "id": task.id,
@@ -66,6 +66,7 @@ def _serialize_task(task: InspectionTask) -> dict:
         "warning_count": task.warning_count,
         "abnormal_count": task.abnormal_count,
         "error_message": task.error_message,
+        "account_names": account_names or [],
     }
 
 
@@ -78,8 +79,24 @@ def list_tasks(
     total = db.query(InspectionTask).count()
     tasks = db.query(InspectionTask).order_by(desc(InspectionTask.started_at)).offset((page - 1) * page_size).limit(page_size).all()
     pages = (total + page_size - 1) // page_size
+
+    items = []
+    for task in tasks:
+        # 获取该任务关联的账号名称
+        account_ids = db.query(InspectionResult.account_id).filter(
+            InspectionResult.task_id == task.id
+        ).distinct().all()
+        account_ids = [aid[0] for aid in account_ids]
+
+        account_names = []
+        if account_ids:
+            accounts = db.query(CloudAccount.name).filter(CloudAccount.id.in_(account_ids)).all()
+            account_names = [a[0] for a in accounts]
+
+        items.append(_serialize_task(task, account_names))
+
     return success_response(data={
-        "items": [_serialize_task(t) for t in tasks],
+        "items": items,
         "total": total, "page": page, "page_size": page_size, "pages": pages
     })
 
