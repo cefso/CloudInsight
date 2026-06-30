@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Form, Input, Select, message } from 'antd';
 import { createAccount, updateAccount } from '../../api/accounts';
 
@@ -20,6 +20,15 @@ export default function AccountForm({ visible, onClose, onSuccess, initialValues
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const isEdit = !!initialValues?.id;
+
+  // 当 initialValues 变化时，设置表单值
+  useEffect(() => {
+    if (visible && initialValues) {
+      form.setFieldsValue(initialValues);
+    } else if (visible) {
+      form.resetFields();
+    }
+  }, [visible, initialValues, form]);
 
   const handleSubmit = async () => {
     try {
@@ -50,8 +59,9 @@ export default function AccountForm({ visible, onClose, onSuccess, initialValues
       onCancel={onClose}
       confirmLoading={loading}
       width={600}
+      destroyOnClose
     >
-      <Form form={form} layout="vertical" initialValues={initialValues}>
+      <Form form={form} layout="vertical">
         <Form.Item name="name" label="账号名称" rules={[{ required: true }]}>
           <Input placeholder="如：生产环境" />
         </Form.Item>

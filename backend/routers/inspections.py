@@ -1,12 +1,13 @@
 import json
 import io
+import threading
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Optional
-from database import get_db
+from database import get_db, SessionLocal
 from models import InspectionTask, InspectionResult
 from schemas.inspection import TriggerInspectionRequest
 from utils.response import success_response
@@ -14,10 +15,39 @@ from services.inspection_engine import InspectionEngine
 
 router = APIRouter(prefix="/api/inspections", tags=["巡检任务"])
 
+
+def _run_inspection_background(account_ids, trigger_type, task_id):
+    """后台执行巡检任务"""
+    db = SessionLocal()
+    try:
+        engine = InspectionEngine(db)
+        engine.run_inspection(account_ids=account_ids, trigger_type=trigger_type, task_id=task_id)
+    except Exception as e:
+        print(f"巡检任务执行失败: {e}")
+    finally:
+        db.close()
+
+
 @router.post("/trigger")
 def trigger_inspection(request: TriggerInspectionRequest, db: Session = Depends(get_db)):
-    engine = InspectionEngine(db)
-    task = engine.run_inspection(account_ids=request.account_ids, trigger_type="manual")
+    # 先创建任务记录
+    task = InspectionTask(
+        trigger_type="manual",
+        status="running",
+        started_at=datetime.now()
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    
+    # 在后台线程中执行巡检
+    thread = threading.Thread(
+        target=_run_inspection_background,
+        args=(request.account_ids, "manual", task.id),
+        daemon=True
+    )
+    thread.start()
+    
     return success_response(data={"task_id": task.id}, message="巡检任务已启动")
 
 @router.get("/tasks")

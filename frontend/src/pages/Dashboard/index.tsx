@@ -53,10 +53,12 @@ export default function Dashboard() {
     setTriggering(true);
     try {
       await triggerInspection(selectedAccountIds);
-      message.success('巡检任务已启动');
-      setTimeout(fetchData, 3000);
-    } catch { message.error('触发巡检失败'); }
-    finally { setTriggering(false); }
+      message.success('巡检任务已提交，请稍后刷新查看结果');
+    } catch { 
+      message.error('触发巡检失败');
+    } finally {
+      setTriggering(false);
+    }
   };
 
   const columns = [

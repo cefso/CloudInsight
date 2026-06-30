@@ -13,5 +13,6 @@ class InspectionTask(Base):
     completed_at = Column(DateTime)
     total_resources = Column(Integer, default=0)
     normal_count = Column(Integer, default=0)
+    warning_count = Column(Integer, default=0)
     abnormal_count = Column(Integer, default=0)
     error_message = Column(Text)

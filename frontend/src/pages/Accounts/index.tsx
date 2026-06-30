@@ -74,17 +74,21 @@ export default function Accounts() {
       title: '资源类型',
       dataIndex: 'resource_types',
       key: 'types',
-      render: (ts: string[] | null) =>
-        ts ? (
+      render: (ts: string[] | null) => {
+        if (!ts) return <Tag>全部</Tag>;
+        const nameMap: Record<string, string> = {
+          acs_ecs_dashboard: 'ECS',
+          acs_rds_dashboard: 'RDS',
+          slb: 'SLB',
+        };
+        return (
           <Space size={4} wrap>
-            {ts.slice(0, 3).map((t) => (
-              <Tag color="blue" key={t}>{t.split('_')[1]?.toUpperCase()}</Tag>
+            {ts.map((t) => (
+              <Tag color="blue" key={t}>{nameMap[t] || t}</Tag>
             ))}
-            {ts.length > 3 && <Tag>+{ts.length - 3}</Tag>}
           </Space>
-        ) : (
-          <Tag>全部</Tag>
-        ),
+        );
+      },
     },
     {
       title: '状态',

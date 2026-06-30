@@ -71,9 +71,11 @@ def update_account(account_id: int, request: CloudAccountUpdate, db: Session = D
         raise HTTPException(status_code=404, detail="账号不存在")
     if request.name is not None:
         account.name = request.name
-    if request.access_key_id is not None:
+    # 只有当 AK 不包含 *** 时才更新（避免覆盖脱敏值）
+    if request.access_key_id is not None and "***" not in request.access_key_id:
         account.access_key_id = request.access_key_id
-    if request.access_key_secret is not None:
+    # 只有当 SK 不为空且不包含 *** 时才更新
+    if request.access_key_secret is not None and "***" not in request.access_key_secret:
         account.access_key_secret = crypto_service.encrypt(request.access_key_secret)
     if request.regions is not None:
         account.regions = json.dumps(request.regions)
