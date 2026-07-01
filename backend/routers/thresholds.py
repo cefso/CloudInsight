@@ -9,7 +9,6 @@ router = APIRouter(prefix="/api/thresholds", tags=["阈值配置"])
 
 # 资源类型配置
 RESOURCE_TYPES = [
-    {"key": "global", "name": "通用默认", "has_cpu": True, "has_memory": True, "has_disk": True},
     {"key": "ECS", "name": "ECS 云服务器", "has_cpu": True, "has_memory": True, "has_disk": True},
     {"key": "RDS", "name": "RDS 数据库", "has_cpu": True, "has_memory": True, "has_disk": True},
     {"key": "Redis", "name": "Redis 缓存", "has_cpu": False, "has_memory": True, "has_disk": False},
@@ -32,11 +31,8 @@ def _serialize_threshold(t: AlertThreshold) -> dict:
 
 def _init_default_thresholds(db: Session):
     """初始化默认阈值配置"""
-    # 检查是否已有带 resource_type 的记录
-    typed_count = db.query(AlertThreshold).filter(AlertThreshold.resource_type.isnot(None)).count()
-    if typed_count == 0:
-        # 删除旧的无类型的记录
-        db.query(AlertThreshold).filter(AlertThreshold.resource_type.is_(None)).delete()
+    existing = db.query(AlertThreshold).count()
+    if existing == 0:
         for rt in RESOURCE_TYPES:
             threshold = AlertThreshold(
                 resource_type=rt["key"],
@@ -44,9 +40,13 @@ def _init_default_thresholds(db: Session):
                 cpu_threshold=90.0 if rt["has_cpu"] else None,
                 memory_threshold=90.0 if rt["has_memory"] else None,
                 disk_threshold=90.0 if rt["has_disk"] else None,
-                is_default=(rt["key"] == "global"),
+                is_default=True,
             )
             db.add(threshold)
+        db.commit()
+    # 迁移：如果存在 global 记录则删除
+    elif db.query(AlertThreshold).filter(AlertThreshold.resource_type == "global").first():
+        db.query(AlertThreshold).filter(AlertThreshold.resource_type == "global").delete()
         db.commit()
 
 
