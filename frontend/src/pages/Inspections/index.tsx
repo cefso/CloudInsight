@@ -38,7 +38,7 @@ export default function Inspections() {
       dataIndex: 'account_names',
       key: 'accounts',
       render: (names: string[]) => {
-        if (!names || names.length === 0) return <span style={{ color: '#8c8c8c' }}>-</span>;
+        if (!names || names.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
         return (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {names.map((name, idx) => <Tag key={idx}>{name}</Tag>)}
@@ -68,13 +68,13 @@ export default function Inspections() {
       title: '正常',
       dataIndex: 'normal_count',
       key: 'normal',
-      render: (v: number) => <span style={{ color: '#16a34a' }}>{v}</span>,
+      render: (v: number) => <span style={{ color: 'var(--color-normal-text)' }}>{v}</span>,
     },
     {
       title: '异常',
       dataIndex: 'abnormal_count',
       key: 'abnormal',
-      render: (v: number) => <span style={{ color: v > 0 ? '#dc2626' : '#16a34a' }}>{v}</span>,
+      render: (v: number) => <span style={{ color: v > 0 ? 'var(--color-abnormal-text)' : 'var(--color-normal-text)' }}>{v}</span>,
     },
     {
       title: '开始时间',

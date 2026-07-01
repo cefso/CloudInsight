@@ -26,7 +26,10 @@ export default function Cron() {
       form.resetFields();
       setModalVisible(false);
       fetchConfigs();
-    } catch (e: any) { if (e.message) message.error(e.message); }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg) message.error(msg);
+    }
   };
 
   const handleToggle = async (id: number, enabled: boolean) => {

@@ -112,6 +112,19 @@ export interface PaginatedResponse<T> {
   pages: number;
 }
 
+// 巡检任务（含账号名称）
+export interface InspectionTaskWithAccounts extends InspectionTask {
+  account_names: string[];
+}
+
+// 资源类型统计
+export interface ResourceTypeStats {
+  total: number;
+  abnormal: number;
+  warning: number;
+  normal: number;
+}
+
 // API 响应
 export interface ApiResponse<T = any> {
   code: number;
