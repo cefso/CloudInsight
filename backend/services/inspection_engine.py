@@ -9,6 +9,7 @@ from services.aliyun_client import AliyunClient, RESOURCE_TYPE_NAMES
 from services.inspectors.metric_inspector import inspect_metrics
 from services.inspectors.slb_inspector import inspect_slb
 from services.inspectors.expiration_inspector import inspect_expiration
+from services.inspectors.event_inspector import inspect_system_events
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,13 @@ class InspectionEngine:
                 normal += exp_result["normal"]
                 warning += exp_result["warning"]
                 abnormal += exp_result["abnormal"]
+
+                # 巡检系统事件
+                event_result = inspect_system_events(self.db, task.id, account, AliyunClient(account.access_key_id, crypto_service.decrypt(account.access_key_secret), "cn-hangzhou"))
+                total += event_result["total"]
+                normal += event_result["normal"]
+                warning += event_result["warning"]
+                abnormal += event_result["abnormal"]
 
             task.status = "completed"
             task.completed_at = datetime.now()

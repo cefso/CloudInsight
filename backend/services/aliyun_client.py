@@ -53,3 +53,6 @@ class AliyunClient:
 
     def get_expiring_instances(self, days_threshold: int = 15) -> list:
         return self._bss.get_expiring_instances(days_threshold)
+
+    def get_system_events(self, hours: int = 24, level: str = None) -> list:
+        return self._cms.get_system_events(hours, level)
