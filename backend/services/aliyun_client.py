@@ -4,13 +4,15 @@ from alibabacloud_cms20190101.client import Client as CmsClient
 from alibabacloud_slb20140515.client import Client as SlbClient
 from alibabacloud_ecs20140526.client import Client as EcsClient
 from alibabacloud_rds20140815.client import Client as RdsClient
+from alibabacloud_bssopenapi20171214.client import Client as BssClient
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_cms20190101 import models as cms_models
 from alibabacloud_slb20140515 import models as slb_models
 from alibabacloud_ecs20140526 import models as ecs_models
 from alibabacloud_rds20140815 import models as rds_models
+from alibabacloud_bssopenapi20171214 import models as bss_models
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,8 @@ class AliyunClient:
 
     def __init__(self, access_key_id: str, access_key_secret: str, region_id: str = "cn-hangzhou"):
         self.region_id = region_id
+        self.access_key_id = access_key_id
+        self.access_key_secret = access_key_secret
         config = open_api_models.Config(
             access_key_id=access_key_id,
             access_key_secret=access_key_secret,
@@ -39,6 +43,13 @@ class AliyunClient:
         self._slb_client = SlbClient(config)
         self._ecs_client = EcsClient(config)
         self._rds_client = RdsClient(config)
+        # BssOpenApi 使用固定 endpoint
+        bss_config = open_api_models.Config(
+            access_key_id=access_key_id,
+            access_key_secret=access_key_secret,
+            region_id='cn-hangzhou'
+        )
+        self._bss_client = BssClient(bss_config)
 
     def test_connection(self) -> dict:
         try:
@@ -305,6 +316,53 @@ class AliyunClient:
             return []
         except Exception as e:
             logger.error(f"获取 SLB 健康状态失败: {e}")
+            return []
+
+    def get_expiring_instances(self, days_threshold: int = 15) -> list:
+        """获取即将到期的实例列表"""
+        try:
+            now = datetime.now(timezone.utc)
+            threshold_time = now + timedelta(days=days_threshold)
+
+            request = bss_models.QueryAvailableInstancesRequest(
+                page_num=1,
+                page_size=100
+            )
+            response = self._bss_client.query_available_instances(request)
+
+            if response.status_code != 200 or not response.body:
+                return []
+
+            data = response.body.data
+            if not data or not data.instance_list:
+                return []
+
+            expiring = []
+            for inst in data.instance_list:
+                if not inst.end_time:
+                    continue
+                try:
+                    # 解析到期时间
+                    end_time_str = inst.end_time.replace('Z', '+00:00')
+                    end_time = datetime.fromisoformat(end_time_str)
+                    days_remaining = (end_time - now).days
+
+                    # 只返回小于阈值的实例
+                    if 0 <= days_remaining <= days_threshold:
+                        expiring.append({
+                            "instance_id": inst.instance_id,
+                            "product_code": inst.product_code,
+                            "region": inst.region or "global",
+                            "end_time": inst.end_time,
+                            "days_remaining": days_remaining,
+                            "status": "abnormal" if days_remaining < 7 else "warning",
+                        })
+                except Exception:
+                    continue
+
+            return expiring
+        except Exception as e:
+            logger.error(f"获取实例到期信息失败: {e}")
             return []
 
 

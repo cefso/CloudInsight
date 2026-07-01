@@ -63,6 +63,13 @@ class InspectionEngine:
                 warning += result["warning"]
                 abnormal += result["abnormal"]
 
+                # 巡检实例到期时间
+                exp_result = self._inspect_expiration(task.id, account)
+                total += exp_result["total"]
+                normal += exp_result["normal"]
+                warning += exp_result["warning"]
+                abnormal += exp_result["abnormal"]
+
             task.status = "completed"
             task.completed_at = datetime.now()
             task.total_resources = total
@@ -285,5 +292,51 @@ class InspectionEngine:
             )
             self.db.add(result)
         
+        self.db.commit()
+        return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}
+
+    def _inspect_expiration(self, task_id: int, account: CloudAccount) -> dict:
+        """巡检实例到期时间"""
+        total, normal, warning, abnormal = 0, 0, 0, 0
+
+        ak = account.access_key_id
+        sk = crypto_service.decrypt(account.access_key_secret)
+        client = AliyunClient(ak, sk, "cn-hangzhou")
+
+        # 获取 15 天内到期的实例
+        expiring = client.get_expiring_instances(days_threshold=15)
+
+        for inst in expiring:
+            total += 1
+            status = inst["status"]
+
+            if status == "abnormal":
+                abnormal += 1
+            elif status == "warning":
+                warning += 1
+            else:
+                normal += 1
+
+            result = InspectionResult(
+                task_id=task_id,
+                account_id=account.id,
+                resource_type="Expiration",
+                resource_id=inst["instance_id"],
+                resource_name=f"{inst['product_code']} ({inst['instance_id']})",
+                region=inst["region"],
+                cpu_usage=None,
+                memory_usage=None,
+                disk_usage=None,
+                disk_details=json.dumps({
+                    "product_code": inst["product_code"],
+                    "end_time": inst["end_time"],
+                    "days_remaining": inst["days_remaining"],
+                }),
+                status=status,
+                abnormal_metrics=json.dumps([f"剩余 {inst['days_remaining']} 天到期"]),
+                inspected_at=datetime.now()
+            )
+            self.db.add(result)
+
         self.db.commit()
         return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}
