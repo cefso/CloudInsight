@@ -3,10 +3,10 @@ import io
 import logging
 import threading
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from sqlalchemy import desc
 from typing import Optional
 from database import get_db, SessionLocal
 from models import InspectionTask, InspectionResult, CloudAccount
@@ -143,6 +143,8 @@ def list_results(
             "memory_usage": r.memory_usage,
             "disk_usage": r.disk_usage,
             "disk_details": r.disk_details,
+            "slb_details": r.slb_details,
+            "expiration_details": r.expiration_details,
             "status": r.status,
             "abnormal_metrics": json.loads(r.abnormal_metrics) if r.abnormal_metrics else None,
             "inspected_at": r.inspected_at,

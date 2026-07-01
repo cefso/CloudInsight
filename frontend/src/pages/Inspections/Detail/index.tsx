@@ -116,7 +116,7 @@ export default function InspectionDetail() {
 
   const groupedResults: GroupedResults = results.reduce<GroupedResults>((acc, item) => {
     if (item.resource_type === 'SLB') {
-      const slbDetails = safeParseJSON(item.disk_details, {} as { listeners?: SlbListener[]; backend_servers?: SlbBackendServer[] });
+      const slbDetails = safeParseJSON(item.slb_details, {} as { listeners?: SlbListener[]; backend_servers?: SlbBackendServer[] });
       const listeners = slbDetails.listeners || [];
       const hasListenerWarning = listeners.some((l) => l.status === 'stopped');
       const hasListenerAbnormal = listeners.some((l) => l.status !== 'running' && l.status !== 'stopped');
@@ -189,7 +189,7 @@ export default function InspectionDetail() {
   };
 
   const renderSlbListenerItems = (record: InspectionResult) => {
-    const slbDetails = safeParseJSON<{ listeners?: SlbListener[] }>(record.disk_details, {});
+    const slbDetails = safeParseJSON<{ listeners?: SlbListener[] }>(record.slb_details, {});
     let listeners = slbDetails.listeners || [];
     if (showMode === 'abnormal' || showMode === 'warning') {
       listeners = listeners.filter((l) => l.status !== 'running');
@@ -210,7 +210,7 @@ export default function InspectionDetail() {
   };
 
   const renderSlbBackendItems = (record: InspectionResult) => {
-    const slbDetails = safeParseJSON<{ backend_servers?: SlbBackendServer[] }>(record.disk_details, {});
+    const slbDetails = safeParseJSON<{ backend_servers?: SlbBackendServer[] }>(record.slb_details, {});
     let backendServers = slbDetails.backend_servers || [];
     if (showMode === 'abnormal' || showMode === 'warning') {
       backendServers = backendServers.filter((s) => s.status !== 'normal');
@@ -348,7 +348,7 @@ export default function InspectionDetail() {
                 <div style={{ textAlign: 'center' }}>状态</div>
               </div>
               {filteredItems.map((item) => {
-                const details = safeParseJSON(item.disk_details, {} as Record<string, unknown>);
+                const details = safeParseJSON(item.expiration_details, {} as Record<string, unknown>);
                 return (
                   <div key={item.id} style={{
                     display: 'grid', gridTemplateColumns: gridCols,
