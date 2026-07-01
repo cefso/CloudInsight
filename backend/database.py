@@ -39,6 +39,23 @@ def _migrate_columns():
     except Exception:
         pass
 
+def _migrate_expiration_data():
+    """将旧的 Expiration 记录从 disk_details 迁移到 expiration_details"""
+    import sqlite3
+    db_path = settings.database_url.replace("sqlite:///", "")
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE inspection_results SET expiration_details = disk_details "
+            "WHERE resource_type = 'Expiration' AND expiration_details IS NULL AND disk_details IS NOT NULL"
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     _migrate_columns()
+    _migrate_expiration_data()
