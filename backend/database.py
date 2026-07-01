@@ -50,6 +50,11 @@ def _migrate_expiration_data():
             "UPDATE inspection_results SET expiration_details = disk_details "
             "WHERE resource_type = 'Expiration' AND expiration_details IS NULL AND disk_details IS NOT NULL"
         )
+        # 将旧的 SLB 记录从 disk_details 迁移到 slb_details
+        cursor.execute(
+            "UPDATE inspection_results SET slb_details = disk_details "
+            "WHERE resource_type = 'SLB' AND slb_details IS NULL AND disk_details IS NOT NULL"
+        )
         conn.commit()
         conn.close()
     except Exception:
