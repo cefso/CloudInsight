@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Switch, message, Breadcrumb, Popconfirm } from 'antd';
+import { Card, Table, Button, Space, Modal, Form, Input, Switch, message, Popconfirm, Select, Tag } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getCronConfigs, createCronConfig, updateCronConfig, deleteCronConfig } from '../../api/inspections';
+import { getAccounts } from '../../api/accounts';
+import PageHeader from '../../components/PageHeader';
 
 export default function Cron() {
   const [configs, setConfigs] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -16,7 +19,11 @@ export default function Cron() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchConfigs(); }, []);
+  const fetchAccounts = async () => {
+    try { setAccounts(await getAccounts()); } catch { /* ignore */ }
+  };
+
+  useEffect(() => { fetchConfigs(); fetchAccounts(); }, []);
 
   const handleCreate = async () => {
     try {
@@ -26,10 +33,7 @@ export default function Cron() {
       form.resetFields();
       setModalVisible(false);
       fetchConfigs();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '';
-      if (msg) message.error(msg);
-    }
+    } catch (e: any) { if (e.message) message.error(e.message); }
   };
 
   const handleToggle = async (id: number, enabled: boolean) => {
@@ -48,6 +52,10 @@ export default function Cron() {
   const columns = [
     { title: '任务名称', dataIndex: 'name', key: 'name' },
     { title: 'Cron 表达式', dataIndex: 'cron_expression', key: 'cron', render: (e: string) => <code>{e}</code> },
+    { title: '适用账号', dataIndex: 'account_names', key: 'accounts', render: (names: string[]) => {
+      if (!names || names.length === 0) return <Tag>全部账号</Tag>;
+      return <Space size={4} wrap>{names.map((n, i) => <Tag key={i}>{n}</Tag>)}</Space>;
+    }},
     { title: '状态', dataIndex: 'is_enabled', key: 'enabled', render: (e: boolean, r: any) => <Switch checked={e} onChange={v => handleToggle(r.id, v)} /> },
     { title: '上次运行', dataIndex: 'last_run_at', key: 'last', render: (t: string) => t || '-' },
     { title: '下次运行', dataIndex: 'next_run_at', key: 'next', render: (t: string) => t || '-' },
@@ -56,21 +64,25 @@ export default function Cron() {
 
   return (
     <div>
-      <Breadcrumb items={[{ title: '配置中心' }, { title: '定时任务' }]} style={{ marginBottom: 16 }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>定时任务管理</h1>
-          <p style={{ color: 'var(--ant-color-text-secondary)', margin: '4px 0 0 0' }}>配置自动巡检的定时任务</p>
+      <PageHeader breadcrumbs={[{ title: '配置中心' }, { title: '定时任务' }]} title="定时任务管理" subtitle="配置自动巡检的定时任务" />
+      <Card>
+        <div style={{ marginBottom: 16 }}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)}>添加任务</Button>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalVisible(true)}>添加任务</Button>
-      </div>
-      <Card><Table columns={columns} dataSource={configs} rowKey="id" loading={loading} /></Card>
+        <Table columns={columns} dataSource={configs} rowKey="id" loading={loading} />
+      </Card>
       <Modal title="添加定时任务" open={modalVisible} onOk={handleCreate} onCancel={() => setModalVisible(false)}>
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="任务名称" rules={[{ required: true }]}><Input placeholder="如：每日巡检" /></Form.Item>
           <Form.Item name="cron_expression" label="Cron 表达式" rules={[{ required: true }]}><Input placeholder="如：0 8 * * * (每天8点)" /></Form.Item>
+          <Form.Item name="account_ids" label="适用账号">
+            <Select mode="multiple" placeholder="留空则巡检所有账号" allowClear
+              options={accounts.map(a => ({ label: a.name, value: a.id }))} />
+          </Form.Item>
         </Form>
-        <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 12 }}>格式: 分 时 日 月 周。示例: 0 8 * * * (每天8点), 0 */2 * * * (每2小时)</p>
+        <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 12, marginTop: 8 }}>
+          Cron 格式: 分 时 日 月 周。示例: 0 8 * * * (每天8点), 0 */2 * * * (每2小时)
+        </p>
       </Modal>
     </div>
   );
