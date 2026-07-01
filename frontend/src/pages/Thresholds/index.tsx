@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Card, Form, InputNumber, Button, message, Breadcrumb, Space, Tag } from 'antd';
+import { Card, Form, InputNumber, Button, message, Breadcrumb, Space } from 'antd';
 import { getThresholds, updateThreshold } from '../../api/inspections';
-import { CloudServerOutlined, DatabaseOutlined, SaveOutlined, SettingOutlined } from '@ant-design/icons';
+import { CloudServerOutlined, DatabaseOutlined, SaveOutlined } from '@ant-design/icons';
 import type { AlertThreshold } from '../../types';
 
 const RESOURCE_CONFIG: Record<string, { label: string; icon: any; color: string; hasCpu: boolean; hasMemory: boolean; hasDisk: boolean }> = {
-  global: { label: '通用默认', icon: <SettingOutlined />, color: '#6b7280', hasCpu: true, hasMemory: true, hasDisk: true },
   ECS: { label: 'ECS 云服务器', icon: <CloudServerOutlined />, color: '#3b82f6', hasCpu: true, hasMemory: true, hasDisk: true },
   RDS: { label: 'RDS 数据库', icon: <DatabaseOutlined />, color: '#8b5cf6', hasCpu: true, hasMemory: true, hasDisk: true },
   Redis: { label: 'Redis 缓存', icon: <SaveOutlined />, color: '#dc2626', hasCpu: false, hasMemory: true, hasDisk: false },
 };
 
-const CARD_ORDER = ['global', 'ECS', 'RDS', 'Redis'];
+const CARD_ORDER = ['ECS', 'RDS', 'Redis'];
 
 function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSave: (id: number, values: any) => Promise<void> }) {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
-  const config = RESOURCE_CONFIG[threshold.resource_type || 'global'] || RESOURCE_CONFIG.global;
-  const isGlobal = threshold.resource_type === 'global';
+  const config = RESOURCE_CONFIG[threshold.resource_type || 'ECS'] || RESOURCE_CONFIG.ECS;
 
   useEffect(() => {
     form.setFieldsValue(threshold);
@@ -52,7 +50,6 @@ function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSav
           <span>{config.label}</span>
         </div>
       }
-      extra={isGlobal ? <Tag>默认</Tag> : null}
     >
       <Form form={form} layout="vertical">
         {config.hasCpu && (
@@ -134,7 +131,7 @@ export default function Thresholds() {
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>告警阈值设置</h1>
         <p style={{ color: 'var(--ant-color-text-secondary)', margin: '8px 0 0 0' }}>
-          通用默认阈值适用于未单独配置的资源类型，已单独配置的资源类型优先使用自身阈值。
+          各资源类型独立配置告警阈值，未配置的指标使用系统默认值 90%。
         </p>
       </div>
 
