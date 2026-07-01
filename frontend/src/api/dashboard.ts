@@ -19,6 +19,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   return await api.get('/dashboard/stats');
 }
 
-export async function getAbnormalResources(limit = 10): Promise<AbnormalResource[]> {
-  return await api.get('/dashboard/abnormal-resources', { params: { limit } });
+export async function getAbnormalResources(limit = 10, accountId?: number): Promise<AbnormalResource[]> {
+  const params: any = { limit };
+  if (accountId) params.account_id = accountId;
+  return await api.get('/dashboard/abnormal-resources', { params });
 }

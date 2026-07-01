@@ -16,54 +16,54 @@ export default function Dashboard() {
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [filterAccountId, setFilterAccountId] = useState<number | undefined>(undefined);
 
-  const fetchData = async () => {
+  const fetchStats = async () => {
+    try {
+      const statsData = await getDashboardStats();
+      setStats(statsData);
+    } catch { message.error('获取统计数据失败'); }
+  };
+
+  const fetchAbnormalResources = async (accountId?: number) => {
     setLoading(true);
     try {
-      const [statsData, resourcesData] = await Promise.all([getDashboardStats(), getAbnormalResources(10)]);
-      setStats(statsData);
-      setAbnormalResources(resourcesData);
-    } catch { message.error('获取数据失败'); }
+      const data = await getAbnormalResources(10, accountId);
+      setAbnormalResources(data);
+    } catch { message.error('获取异常资源失败'); }
     finally { setLoading(false); }
   };
 
   const fetchAccounts = async () => {
-    try {
-      const data = await getAccounts();
-      setAccounts(data);
-    } catch { /* ignore */ }
+    try { setAccounts(await getAccounts()); } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchData(); fetchAccounts(); }, []);
+  useEffect(() => { fetchStats(); fetchAccounts(); fetchAbnormalResources(); }, []);
+
+  useEffect(() => { fetchAbnormalResources(filterAccountId); }, [filterAccountId]);
+
+  const getAccountName = (id: number) => accounts.find(a => a.id === id)?.name || `账号${id}`;
 
   const handleTriggerClick = () => {
-    if (accounts.length === 0) {
-      message.warning('请先配置云账号');
-      return;
-    }
+    if (accounts.length === 0) { message.warning('请先配置云账号'); return; }
     setSelectedAccountIds([]);
     setShowAccountModal(true);
   };
 
   const handleTriggerConfirm = async () => {
-    if (selectedAccountIds.length === 0) {
-      message.warning('请选择要巡检的账号');
-      return;
-    }
+    if (selectedAccountIds.length === 0) { message.warning('请选择要巡检的账号'); return; }
     setShowAccountModal(false);
     setTriggering(true);
     try {
       await triggerInspection(selectedAccountIds);
       message.success('巡检任务已提交，请稍后刷新查看结果');
-    } catch { 
-      message.error('触发巡检失败');
-    } finally {
-      setTriggering(false);
-    }
+    } catch { message.error('触发巡检失败'); }
+    finally { setTriggering(false); }
   };
 
   const columns = [
     { title: '资源类型', dataIndex: 'resource_type', key: 'type', render: (t: string) => <Tag color="red">{t}</Tag> },
+    { title: '账号', dataIndex: 'account_id', key: 'account', render: (id: number) => <Tag>{getAccountName(id)}</Tag> },
     { title: '资源名称', dataIndex: 'resource_name', key: 'name' },
     { title: '实例ID', dataIndex: 'resource_id', key: 'id', render: (id: string) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{id}</span> },
     { title: '地域', dataIndex: 'region', key: 'region', render: (r: string) => <Tag>{r}</Tag> },
@@ -90,7 +90,18 @@ export default function Dashboard() {
         <Col span={6}><Card loading={loading}><Statistic title="存在异常" value={stats?.abnormal_count || 0} prefix={<WarningOutlined />} styles={{ content: { color: '#dc2626' } }} /></Card></Col>
         <Col span={6}><Card loading={loading}><Statistic title="巡检账号" value={stats?.account_count || 0} /></Card></Col>
       </Row>
-      <Card title="异常资源列表" loading={loading}>
+      <Card title="异常资源列表" loading={loading}
+        extra={
+          <Select
+            allowClear
+            placeholder="按账号筛选"
+            style={{ width: 200 }}
+            value={filterAccountId}
+            onChange={setFilterAccountId}
+            options={accounts.map(a => ({ label: a.name, value: a.id }))}
+          />
+        }
+      >
         <Table columns={columns} dataSource={abnormalResources} rowKey="id" pagination={false} />
       </Card>
 
@@ -109,10 +120,7 @@ export default function Dashboard() {
           placeholder="选择账号"
           value={selectedAccountIds}
           onChange={setSelectedAccountIds}
-          options={accounts.map(a => ({
-            label: `${a.name} (${a.access_key_id})`,
-            value: a.id,
-          }))}
+          options={accounts.map(a => ({ label: `${a.name} (${a.access_key_id})`, value: a.id }))}
         />
       </Modal>
     </div>
