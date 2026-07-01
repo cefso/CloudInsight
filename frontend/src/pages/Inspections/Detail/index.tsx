@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
@@ -21,6 +21,7 @@ const RESOURCE_ICONS: Record<string, ReactNode> = {
   RDS: <DatabaseOutlined />,
   SLB_Listener: <ApiOutlined />,
   SLB_Backend: <ApiOutlined />,
+  Expiration: <ClockCircleOutlined />,
 };
 
 const RESOURCE_COLORS: Record<string, string> = {
@@ -28,6 +29,7 @@ const RESOURCE_COLORS: Record<string, string> = {
   RDS: '#8b5cf6',
   SLB_Listener: '#f59e0b',
   SLB_Backend: '#10b981',
+  Expiration: '#ef4444',
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -35,6 +37,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   RDS: 'RDS 资源',
   SLB_Listener: 'SLB 监听器',
   SLB_Backend: 'SLB 后端服务器',
+  Expiration: '实例到期提醒',
 };
 
 interface GroupedItem extends InspectionResult {
@@ -314,6 +317,8 @@ export default function InspectionDetail() {
         const color = RESOURCE_COLORS[resourceType] || '#3b82f6';
         const label = RESOURCE_LABELS[resourceType] || `${resourceType} 资源`;
         const isSlbType = resourceType === 'SLB_Listener' || resourceType === 'SLB_Backend';
+        const isExpiration = resourceType === 'Expiration';
+        const gridCols = isExpiration ? '2fr 2fr 1.5fr 2fr 1fr' : isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr';
 
         return (
           <Card key={resourceType} id={`resource-${resourceType}`} style={{ marginBottom: 16, scrollMarginTop: 20 }}
@@ -333,35 +338,54 @@ export default function InspectionDetail() {
             </Space>}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr', gap: 16, padding: '8px 12px', background: 'var(--color-table-header-bg)', borderRadius: '8px 8px 0 0', fontSize: 12, color: 'var(--color-muted)', fontWeight: 500, borderBottom: '1px solid var(--color-table-border)' }}>
-                <div>资源名称</div>
-                <div>实例ID</div>
-                <div>账号 / 地域</div>
-                <div style={{ textAlign: 'center' }}>{resourceType === 'SLB_Listener' ? '监听器状态' : resourceType === 'SLB_Backend' ? '后端服务器状态' : 'CPU'}</div>
-                {!isSlbType && <div style={{ textAlign: 'center' }}>内存</div>}
-                {!isSlbType && <div style={{ textAlign: 'center' }}>磁盘</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 16, padding: '8px 12px', background: 'var(--color-table-header-bg)', borderRadius: '8px 8px 0 0', fontSize: 12, color: 'var(--color-muted)', fontWeight: 500, borderBottom: '1px solid var(--color-table-border)' }}>
+                <div>{isExpiration ? '产品' : '资源名称'}</div>
+                <div>{isExpiration ? '实例ID' : '实例ID'}</div>
+                <div>{isExpiration ? '地域' : '账号 / 地域'}</div>
+                <div style={{ textAlign: 'center' }}>{isExpiration ? '到期时间' : resourceType === 'SLB_Listener' ? '监听器状态' : resourceType === 'SLB_Backend' ? '后端服务器状态' : 'CPU'}</div>
+                {isExpiration ? <div style={{ textAlign: 'center' }}>剩余天数</div> : !isSlbType && <div style={{ textAlign: 'center' }}>内存</div>}
+                {!isSlbType && !isExpiration && <div style={{ textAlign: 'center' }}>磁盘</div>}
                 <div style={{ textAlign: 'center' }}>状态</div>
               </div>
-              {filteredItems.map((item) => (
-                <div key={item.id} style={{
-                  display: 'grid', gridTemplateColumns: isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr',
-                  gap: 16, padding: '12px 16px',
-                  background: statusBg(item.status),
-                  borderBottom: '1px solid var(--color-table-border)',
-                  borderLeft: `3px solid ${statusBorder(item.status)}`,
-                  alignItems: 'center'
-                }}>
-                  <div style={{ fontWeight: 500 }}>{item.resource_name || '-'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{item.resource_id}</div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}><Tag style={{ margin: 0 }}>{getAccountName(item.account_id)}</Tag><Tag style={{ margin: 0 }}>{item.region}</Tag></div>
-                  {resourceType === 'SLB_Listener' ? <div>{renderSlbListenerItems(item)}</div> : resourceType === 'SLB_Backend' ? <div>{renderSlbBackendItems(item)}</div> : <><div style={{ textAlign: 'center' }}>{renderMetric(item.cpu_usage)}</div><div style={{ textAlign: 'center' }}>{renderMetric(item.memory_usage)}</div><div style={{ textAlign: 'center' }}>{renderDiskDetails(item)}</div></>}
-                  <div style={{ textAlign: 'center' }}>
-                    <Tag color={item.status === 'abnormal' ? 'error' : item.status === 'warning' ? 'warning' : 'success'}>
-                      {item.status === 'abnormal' ? '异常' : item.status === 'warning' ? '警告' : '正常'}
-                    </Tag>
+              {filteredItems.map((item) => {
+                const details = safeParseJSON(item.disk_details, {} as Record<string, unknown>);
+                return (
+                  <div key={item.id} style={{
+                    display: 'grid', gridTemplateColumns: gridCols,
+                    gap: 16, padding: '12px 16px',
+                    background: statusBg(item.status),
+                    borderBottom: '1px solid var(--color-table-border)',
+                    borderLeft: `3px solid ${statusBorder(item.status)}`,
+                    alignItems: 'center'
+                  }}>
+                    {isExpiration ? (
+                      <>
+                        <div style={{ fontWeight: 500 }}>{details.product_code as string || '-'}</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{item.resource_id}</div>
+                        <div><Tag style={{ margin: 0 }}>{item.region}</Tag></div>
+                        <div style={{ textAlign: 'center', fontSize: 13 }}>{details.end_time ? dayjs(details.end_time as string).format('YYYY-MM-DD') : '-'}</div>
+                        <div style={{ textAlign: 'center' }}>
+                          <span style={{ color: (details.days_remaining as number) < 7 ? 'var(--color-abnormal-text)' : 'var(--color-warning-text)', fontWeight: 600, fontSize: 16 }}>
+                            {details.days_remaining as number} 天
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 500 }}>{item.resource_name || '-'}</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{item.resource_id}</div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}><Tag style={{ margin: 0 }}>{getAccountName(item.account_id)}</Tag><Tag style={{ margin: 0 }}>{item.region}</Tag></div>
+                        {resourceType === 'SLB_Listener' ? <div>{renderSlbListenerItems(item)}</div> : resourceType === 'SLB_Backend' ? <div>{renderSlbBackendItems(item)}</div> : <><div style={{ textAlign: 'center' }}>{renderMetric(item.cpu_usage)}</div><div style={{ textAlign: 'center' }}>{renderMetric(item.memory_usage)}</div><div style={{ textAlign: 'center' }}>{renderDiskDetails(item)}</div></>}
+                      </>
+                    )}
+                    <div style={{ textAlign: 'center' }}>
+                      <Tag color={item.status === 'abnormal' ? 'error' : item.status === 'warning' ? 'warning' : 'success'}>
+                        {item.status === 'abnormal' ? '异常' : item.status === 'warning' ? '警告' : '正常'}
+                      </Tag>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         );
