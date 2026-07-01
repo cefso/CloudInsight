@@ -20,6 +20,10 @@ class CmsClientWrapper:
             "name": "RDS",
             "metrics": ["CpuUsage", "MemoryUsage", "DiskUsage"],
         },
+        "acs_kvstore": {
+            "name": "Redis",
+            "metrics": ["MemoryUsage"],
+        },
     }
 
     def __init__(self, config: open_api_models.Config, region_id: str):
