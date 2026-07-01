@@ -32,8 +32,11 @@ def _serialize_threshold(t: AlertThreshold) -> dict:
 
 def _init_default_thresholds(db: Session):
     """初始化默认阈值配置"""
-    existing = db.query(AlertThreshold).count()
-    if existing == 0:
+    # 检查是否已有带 resource_type 的记录
+    typed_count = db.query(AlertThreshold).filter(AlertThreshold.resource_type.isnot(None)).count()
+    if typed_count == 0:
+        # 删除旧的无类型的记录
+        db.query(AlertThreshold).filter(AlertThreshold.resource_type.is_(None)).delete()
         for rt in RESOURCE_TYPES:
             threshold = AlertThreshold(
                 resource_type=rt["key"],
