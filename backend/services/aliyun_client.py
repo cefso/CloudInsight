@@ -341,6 +341,9 @@ class AliyunClient:
             for inst in data.instance_list:
                 if not inst.end_time:
                     continue
+                # 排除已标记不续费的实例
+                if inst.renew_status == 'NotRenewal':
+                    continue
                 try:
                     # 解析到期时间
                     end_time_str = inst.end_time.replace('Z', '+00:00')
