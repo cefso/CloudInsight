@@ -17,8 +17,7 @@ class BssClientWrapper:
         )
         self._client = BssClient(bss_config)
 
-    # 排除不需要关注到期的资源类型
-    EXCLUDED_PRODUCT_PREFIXES = ('mimg', 'snapshot', 'ram', 'actiontrail', 'eip')
+    # 排除不需要关注到期的产品码
     EXCLUDED_PRODUCT_CODES = {'mpsofeware-mt9-dt41', 'mpservice-mt9-dt41'}
 
     def get_expiring_instances(self, days_threshold: int = 15) -> list:
@@ -45,10 +44,8 @@ class BssClientWrapper:
                     continue
                 if inst.renew_status == 'NotRenewal':
                     continue
-                # 排除镜像、快照等非基础设施资源
+                # 排除指定产品码
                 product_code = (inst.product_code or '').lower()
-                if any(product_code.startswith(p) for p in self.EXCLUDED_PRODUCT_PREFIXES):
-                    continue
                 if product_code in self.EXCLUDED_PRODUCT_CODES:
                     continue
                 try:
