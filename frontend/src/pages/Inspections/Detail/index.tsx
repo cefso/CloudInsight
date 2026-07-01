@@ -74,7 +74,7 @@ export default function InspectionDetail() {
 
   const groupedResults: GroupedResults = results.reduce<GroupedResults>((acc, item) => {
     if (item.resource_type === 'SLB') {
-      const slb = safeParseJSON(item.disk_details, {} as { listeners?: SlbListener[]; backend_servers?: SlbBackendServer[] });
+      const slb = safeParseJSON(item.slb_details, {} as { listeners?: SlbListener[]; backend_servers?: SlbBackendServer[] });
       const listeners = slb.listeners || [];
       const hasListenerWarning = listeners.some(l => l.status === 'stopped');
       const hasListenerAbnormal = listeners.some(l => l.status !== 'running' && l.status !== 'stopped');
@@ -137,7 +137,7 @@ export default function InspectionDetail() {
   };
 
   const renderSlbListenerItems = (record: InspectionResult) => {
-    const slb = safeParseJSON<{ listeners?: SlbListener[] }>(record.disk_details, {});
+    const slb = safeParseJSON<{ listeners?: SlbListener[] }>(record.slb_details, {});
     let listeners = slb.listeners || [];
     if (showMode === 'abnormal' || showMode === 'warning') listeners = listeners.filter(l => l.status !== 'running');
     if (listeners.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
@@ -154,7 +154,7 @@ export default function InspectionDetail() {
   };
 
   const renderSlbBackendItems = (record: InspectionResult) => {
-    const slb = safeParseJSON<{ backend_servers?: SlbBackendServer[] }>(record.disk_details, {});
+    const slb = safeParseJSON<{ backend_servers?: SlbBackendServer[] }>(record.slb_details, {});
     let servers = slb.backend_servers || [];
     if (showMode === 'abnormal' || showMode === 'warning') servers = servers.filter(s => s.status !== 'normal');
     if (servers.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
