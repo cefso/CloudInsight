@@ -136,20 +136,36 @@ export default function InspectionDetail() {
     );
   };
 
+  function ExpandableList({ items, maxItems = 3, renderItem }: { items: any[]; maxItems?: number; renderItem: (item: any, idx: number) => ReactNode }) {
+    const [expanded, setExpanded] = useState(false);
+    if (items.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
+    const visible = expanded ? items : items.slice(0, maxItems);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {visible.map((item, i) => renderItem(item, i))}
+        {items.length > maxItems && (
+          <a onClick={() => setExpanded(!expanded)} style={{ fontSize: 12, color: 'var(--color-primary)', cursor: 'pointer' }}>
+            {expanded ? '收起' : `还有 ${items.length - maxItems} 个...`}
+          </a>
+        )}
+      </div>
+    );
+  }
+
   const renderSlbListenerItems = (record: InspectionResult) => {
     const slb = safeParseJSON<{ listeners?: SlbListener[] }>(record.slb_details, {});
     let listeners = slb.listeners || [];
     if (showMode === 'abnormal' || showMode === 'warning') listeners = listeners.filter(l => l.status !== 'running');
-    if (listeners.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {listeners.map((l, i) => (
+      <ExpandableList
+        items={listeners}
+        renderItem={(l: SlbListener, i: number) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{l.protocol}:{l.port}</span>
             <Tag color={l.status === 'running' ? 'success' : l.status === 'stopped' ? 'warning' : 'error'} style={{ margin: 0, fontSize: 11 }}>{l.status}</Tag>
           </div>
-        ))}
-      </div>
+        )}
+      />
     );
   };
 
@@ -157,16 +173,16 @@ export default function InspectionDetail() {
     const slb = safeParseJSON<{ backend_servers?: SlbBackendServer[] }>(record.slb_details, {});
     let servers = slb.backend_servers || [];
     if (showMode === 'abnormal' || showMode === 'warning') servers = servers.filter(s => s.status !== 'normal');
-    if (servers.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {servers.map((s, i) => (
+      <ExpandableList
+        items={servers}
+        renderItem={(s: SlbBackendServer, i: number) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{s.serverIp}:{s.port}</span>
             <Tag color={s.status === 'normal' ? 'success' : s.status === 'unavailable' ? 'warning' : 'error'} style={{ margin: 0, fontSize: 11 }}>{s.status}</Tag>
           </div>
-        ))}
-      </div>
+        )}
+      />
     );
   };
 
