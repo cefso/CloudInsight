@@ -24,6 +24,8 @@ const RESOURCE_LABELS: Record<string, string> = {
   Expiration: '实例到期提醒', SystemEvent: '系统事件',
 };
 
+const RESOURCE_ORDER = ['ECS', 'RDS', 'Redis', 'SLB_Listener', 'SLB_Backend', 'Expiration', 'SystemEvent'];
+
 interface GroupedItem extends InspectionResult { status: 'normal' | 'warning' | 'abnormal'; }
 type GroupedResults = Record<string, GroupedItem[]>;
 
@@ -239,7 +241,9 @@ export default function InspectionDetail() {
 
       {/* 资源类型统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {Object.entries(groupedResults).map(([resourceType, items]) => {
+        {Object.entries(groupedResults)
+          .sort(([a], [b]) => RESOURCE_ORDER.indexOf(a) - RESOURCE_ORDER.indexOf(b))
+          .map(([resourceType, items]) => {
           const stats = getResourceTypeStats(items);
           const icon = RESOURCE_ICONS[resourceType] || <CloudServerOutlined />;
           const color = RESOURCE_COLORS[resourceType] || '#3b82f6';
@@ -266,7 +270,9 @@ export default function InspectionDetail() {
       </Row>
 
       {/* 资源详情卡片 */}
-      {Object.entries(groupedResults).map(([resourceType, items]) => {
+      {Object.entries(groupedResults)
+        .sort(([a], [b]) => RESOURCE_ORDER.indexOf(a) - RESOURCE_ORDER.indexOf(b))
+        .map(([resourceType, items]) => {
         const filteredItems = getFilteredItems(items);
         if (filteredItems.length === 0) return null;
         const stats = getResourceTypeStats(items);
