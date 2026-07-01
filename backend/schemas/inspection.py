@@ -17,11 +17,13 @@ class ThresholdUpdate(BaseModel):
 class CronConfigCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     cron_expression: str
+    account_ids: Optional[list[int]] = None
 
 
 class CronConfigUpdate(BaseModel):
     name: Optional[str] = None
     cron_expression: Optional[str] = None
+    account_ids: Optional[list[int]] = None
     is_enabled: Optional[bool] = None
 
 
