@@ -1,3 +1,4 @@
+import json
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -64,8 +65,11 @@ class TaskScheduler:
             if config:
                 config.last_run_at = datetime.now()
                 db.commit()
+                account_ids = json.loads(config.account_ids) if config.account_ids else None
+            else:
+                account_ids = None
             engine = InspectionEngine(db)
-            engine.run_inspection(trigger_type="cron")
+            engine.run_inspection(trigger_type="cron", account_ids=account_ids)
         except Exception as e:
             logger.error(f"定时巡检失败: {e}")
         finally:
