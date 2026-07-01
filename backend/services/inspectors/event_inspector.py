@@ -56,7 +56,7 @@ def inspect_system_events(
             "product": product,
             "level": level,
             "status": event.get("status"),
-            "content": event.get("content", "")[:200],  # 截断内容
+            "content": event.get("content", ""),
             "time": event.get("time"),
         }
 
