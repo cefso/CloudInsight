@@ -103,7 +103,7 @@ def inspect_slb(
             cpu_usage=None,
             memory_usage=None,
             disk_usage=None,
-            disk_details=json.dumps(slb_details),
+            slb_details=json.dumps(slb_details),
             status=status,
             abnormal_metrics=json.dumps(all_metrics) if all_metrics else None,
             inspected_at=datetime.now()
