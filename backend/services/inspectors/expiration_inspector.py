@@ -40,7 +40,7 @@ def inspect_expiration(
             cpu_usage=None,
             memory_usage=None,
             disk_usage=None,
-            disk_details=json.dumps({
+            expiration_details=json.dumps({
                 "product_code": inst["product_code"],
                 "end_time": inst["end_time"],
                 "days_remaining": inst["days_remaining"],
