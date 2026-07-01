@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from alibabacloud_bssopenapi20171214.client import Client as BssClient
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_bssopenapi20171214 import models as bss_models
@@ -17,11 +17,14 @@ class BssClientWrapper:
         )
         self._client = BssClient(bss_config)
 
+    # 排除不需要关注到期的资源类型
+    EXCLUDED_PRODUCT_PREFIXES = ('mimg', 'snapshot', 'ram', 'actiontrail', 'eip')
+    EXCLUDED_PRODUCT_CODES = {'mpsofeware-mt9-dt41', 'mpservice-mt9-dt41'}
+
     def get_expiring_instances(self, days_threshold: int = 15) -> list:
         """获取即将到期的实例列表"""
         try:
             now = datetime.now(timezone.utc)
-            threshold_time = now + timedelta(days=days_threshold)
 
             request = bss_models.QueryAvailableInstancesRequest(
                 page_num=1,
@@ -41,6 +44,12 @@ class BssClientWrapper:
                 if not inst.end_time:
                     continue
                 if inst.renew_status == 'NotRenewal':
+                    continue
+                # 排除镜像、快照等非基础设施资源
+                product_code = (inst.product_code or '').lower()
+                if any(product_code.startswith(p) for p in self.EXCLUDED_PRODUCT_PREFIXES):
+                    continue
+                if product_code in self.EXCLUDED_PRODUCT_CODES:
                     continue
                 try:
                     end_time_str = inst.end_time.replace('Z', '+00:00')
