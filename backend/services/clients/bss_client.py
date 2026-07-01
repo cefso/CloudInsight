@@ -18,7 +18,7 @@ class BssClientWrapper:
         self._client = BssClient(bss_config)
 
     # 排除不需要关注到期的产品码
-    EXCLUDED_PRODUCT_CODES = {'mpsofeware-mt9-dt41', 'mpservice-mt9-dt41'}
+    EXCLUDED_PRODUCT_CODES = {'mpsofeware-mt9-dt41'}
 
     def get_expiring_instances(self, days_threshold: int = 15) -> list:
         """获取即将到期的实例列表"""
