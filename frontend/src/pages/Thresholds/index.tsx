@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Form, InputNumber, Button, message, Breadcrumb, Space } from 'antd';
+import { Card, Form, InputNumber, Button, message, Breadcrumb, Space, Tag } from 'antd';
 import { getThresholds, updateThreshold } from '../../api/inspections';
 import { CloudServerOutlined, DatabaseOutlined, SaveOutlined, SettingOutlined } from '@ant-design/icons';
 import type { AlertThreshold } from '../../types';
@@ -11,10 +11,13 @@ const RESOURCE_CONFIG: Record<string, { label: string; icon: any; color: string;
   Redis: { label: 'Redis 缓存', icon: <SaveOutlined />, color: '#dc2626', hasCpu: false, hasMemory: true, hasDisk: false },
 };
 
+const CARD_ORDER = ['global', 'ECS', 'RDS', 'Redis'];
+
 function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSave: (id: number, values: any) => Promise<void> }) {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const config = RESOURCE_CONFIG[threshold.resource_type || 'global'] || RESOURCE_CONFIG.global;
+  const isGlobal = threshold.resource_type === 'global';
 
   useEffect(() => {
     form.setFieldsValue(threshold);
@@ -35,7 +38,7 @@ function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSav
 
   return (
     <Card
-      style={{ borderTop: `3px solid ${config.color}` }}
+      style={{ borderTop: `3px solid ${config.color}`, height: '100%' }}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
@@ -49,6 +52,7 @@ function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSav
           <span>{config.label}</span>
         </div>
       }
+      extra={isGlobal ? <Tag>默认</Tag> : null}
     >
       <Form form={form} layout="vertical">
         {config.hasCpu && (
@@ -117,16 +121,26 @@ export default function Thresholds() {
     fetchThresholds();
   };
 
+  // 按指定顺序排列
+  const sortedThresholds = [...thresholds].sort((a, b) => {
+    const aIdx = CARD_ORDER.indexOf(a.resource_type || 'global');
+    const bIdx = CARD_ORDER.indexOf(b.resource_type || 'global');
+    return aIdx - bIdx;
+  });
+
   return (
     <div>
       <Breadcrumb items={[{ title: '配置中心' }, { title: '告警阈值' }]} style={{ marginBottom: 16 }} />
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24 }}>告警阈值设置</h1>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>告警阈值设置</h1>
+        <p style={{ color: 'var(--ant-color-text-secondary)', margin: '8px 0 0 0' }}>
+          通用默认阈值适用于未单独配置的资源类型，已单独配置的资源类型优先使用自身阈值。
+        </p>
+      </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
-        {thresholds.map(t => (
-          <div key={t.id} style={{ width: 320 }}>
-            <ThresholdCard threshold={t} onSave={handleSave} />
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
+        {sortedThresholds.map(t => (
+          <ThresholdCard key={t.id} threshold={t} onSave={handleSave} />
         ))}
       </div>
     </div>
