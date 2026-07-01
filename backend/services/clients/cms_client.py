@@ -139,6 +139,8 @@ class CmsClientWrapper:
         except Exception as e:
             logger.error(f"获取系统事件失败: {e}")
             return []
+
+    def list_resources(self, namespace: str, metric_name: str = None) -> list:
         """通过指标数据获取资源列表，支持分页"""
         try:
             if not metric_name:
