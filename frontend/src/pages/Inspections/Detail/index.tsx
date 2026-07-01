@@ -182,13 +182,13 @@ export default function InspectionDetail() {
             <div style={{ fontWeight: 500, wordBreak: 'break-word' }}>{(details.name as string) || item.resource_name}</div>
             <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{(details.product as string) || '-'}</div>
             <div><Tag color={details.level === 'CRITICAL' ? 'error' : 'warning'} style={{ margin: 0 }}>{details.level as string}</Tag></div>
-            <div style={{ maxHeight: 80, overflow: 'auto', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>{(details.content as string) || '-'}</div>
+            <div style={{ maxHeight: 60, overflow: 'auto', fontSize: 11, color: 'var(--color-muted)', lineHeight: 1.4 }}>{(details.content as string) || '-'}</div>
             <div></div>
           </>
         ) : isExp ? (
           <>
             <div style={{ fontWeight: 500 }}>{(details.product_code as string) || '-'}</div>
-            <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{item.resource_id}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: 'monospace', wordBreak: 'break-all' }}>{item.resource_id}</div>
             <div><Tag style={{ margin: 0 }}>{item.region}</Tag></div>
             <div style={{ textAlign: 'center', fontSize: 13 }}>{details.end_time ? dayjs(details.end_time as string).format('YYYY-MM-DD') : '-'}</div>
             <div style={{ textAlign: 'center' }}><span style={{ color: (details.days_remaining as number) < 7 ? 'var(--color-abnormal-text)' : 'var(--color-warning-text)', fontWeight: 600, fontSize: 16 }}>{details.days_remaining as number} 天</span></div>
@@ -282,7 +282,7 @@ export default function InspectionDetail() {
         const isSlb = resourceType === 'SLB_Listener' || resourceType === 'SLB_Backend';
         const isExp = resourceType === 'Expiration';
         const isEvt = resourceType === 'SystemEvent';
-        const gridCols = isEvt ? '2fr 2fr 1fr 3fr 0.8fr' : isExp ? '2fr 2fr 1.5fr 2fr 1fr' : isSlb ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr';
+        const gridCols = isEvt ? '1.5fr 1fr 0.8fr 3fr 0.5fr' : isExp ? '1.5fr 2fr 1fr 1.5fr 1fr' : isSlb ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr';
 
         return (
           <Card key={resourceType} id={`resource-${resourceType}`} style={{ marginBottom: 16, scrollMarginTop: 20 }}
