@@ -6,3 +6,37 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* 浅色模式颜色变量 */
+:root {
+  --color-abnormal-bg: #fef2f2;
+  --color-abnormal-border: #ef4444;
+  --color-abnormal-text: #dc2626;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #f59e0b;
+  --color-warning-text: #d97706;
+  --color-normal-bg: #ffffff;
+  --color-normal-border: transparent;
+  --color-normal-text: #16a34a;
+  --color-muted: #8c8c8c;
+  --color-table-header-bg: #f9fafb;
+  --color-table-border: #e5e7eb;
+  --color-card-summary-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 深色模式颜色变量 */
+[data-theme='dark'] {
+  --color-abnormal-bg: #450a0a;
+  --color-abnormal-border: #ef4444;
+  --color-abnormal-text: #f87171;
+  --color-warning-bg: #451a03;
+  --color-warning-border: #f59e0b;
+  --color-warning-text: #fbbf24;
+  --color-normal-bg: #052e16;
+  --color-normal-border: transparent;
+  --color-normal-text: #4ade80;
+  --color-muted: #71717a;
+  --color-table-header-bg: #27272a;
+  --color-table-border: #3f3f46;
+  --color-card-summary-bg: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+}

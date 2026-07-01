@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, Form, Input, Select, message } from 'antd';
 import { createAccount, updateAccount } from '../../api/accounts';
+import type { CloudAccount } from '../../types';
 
 const REGION_OPTIONS = [
   { label: '华东1（杭州）', value: 'cn-hangzhou' },
@@ -16,7 +17,14 @@ const RESOURCE_TYPE_OPTIONS = [
   { label: 'SLB（负载均衡）', value: 'slb' },
 ];
 
-export default function AccountForm({ visible, onClose, onSuccess, initialValues }: any) {
+interface AccountFormProps {
+  visible: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  initialValues?: CloudAccount | null;
+}
+
+export default function AccountForm({ visible, onClose, onSuccess, initialValues }: AccountFormProps) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const isEdit = !!initialValues?.id;
@@ -44,8 +52,9 @@ export default function AccountForm({ visible, onClose, onSuccess, initialValues
       form.resetFields();
       onSuccess();
       onClose();
-    } catch (e: any) {
-      if (e.message) message.error(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg) message.error(msg);
     } finally {
       setLoading(false);
     }

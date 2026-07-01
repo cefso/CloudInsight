@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented } from 'antd';
 import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined } from '@ant-design/icons';
+import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
 import { getAccounts } from '../../../api/accounts';
+import type {
+  InspectionResult,
+  InspectionTaskWithAccounts,
+  CloudAccount,
+  SlbListener,
+  SlbBackendServer,
+  DiskDetail,
+  ResourceTypeStats,
+} from '../../../types';
 
-const RESOURCE_ICONS: Record<string, any> = {
+const RESOURCE_ICONS: Record<string, ReactNode> = {
   ECS: <CloudServerOutlined />,
   RDS: <DatabaseOutlined />,
   SLB_Listener: <ApiOutlined />,
@@ -27,26 +37,32 @@ const RESOURCE_LABELS: Record<string, string> = {
   SLB_Backend: 'SLB 后端服务器',
 };
 
-function safeParseJSON(str: string | null, fallback: any = []): any {
+interface GroupedItem extends InspectionResult {
+  status: 'normal' | 'warning' | 'abnormal';
+}
+
+type GroupedResults = Record<string, GroupedItem[]>;
+
+function safeParseJSON<T>(str: string | null, fallback: T): T {
   if (!str) return fallback;
-  try { return JSON.parse(str); }
+  try { return JSON.parse(str) as T; }
   catch { return fallback; }
 }
 
 export default function InspectionDetail() {
   const { taskId } = useParams();
   const navigate = useNavigate();
-  const [results, setResults] = useState<any[]>([]);
-  const [task, setTask] = useState<any>(null);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [results, setResults] = useState<InspectionResult[]>([]);
+  const [task, setTask] = useState<InspectionTaskWithAccounts | null>(null);
+  const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [, setLoading] = useState(false);
   const [showMode, setShowMode] = useState<'all' | 'warning' | 'abnormal'>('abnormal');
 
   const fetchTask = async () => {
     try {
       const data = await getInspectionTasks(1, 100);
-      const found = data.items?.find((t: any) => t.id === Number(taskId));
-      if (found) setTask(found);
+      const found = data.items?.find((t) => t.id === Number(taskId));
+      if (found) setTask(found as InspectionTaskWithAccounts);
     } catch { /* ignore */ }
   };
 
@@ -60,7 +76,7 @@ export default function InspectionDetail() {
   const fetchResults = async () => {
     setLoading(true);
     try {
-      let allResults: any[] = [];
+      let allResults: InspectionResult[] = [];
       let page = 1;
       let hasMore = true;
       const MAX_PAGES = 50;
@@ -90,63 +106,49 @@ export default function InspectionDetail() {
     } catch { message.error('导出失败'); }
   };
 
-  const getAccountName = (id: number) => {
+  const getAccountName = (id: number): string => {
     const account = accounts.find(a => a.id === id);
     return account ? account.name : `账号${id}`;
   };
 
-  // 按资源类型分组，SLB 拆分为监听器和后端服务器
-  const groupedResults = results.reduce((acc: any, item: any) => {
+  const groupedResults: GroupedResults = results.reduce<GroupedResults>((acc, item) => {
     if (item.resource_type === 'SLB') {
-      // 判断监听器状态
-      const slbDetails = safeParseJSON(item.disk_details, {});
+      const slbDetails = safeParseJSON(item.disk_details, {} as { listeners?: SlbListener[]; backend_servers?: SlbBackendServer[] });
       const listeners = slbDetails.listeners || [];
-      const hasListenerWarning = listeners.some((l: any) => l.status === 'stopped');
-      const hasListenerAbnormal = listeners.some((l: any) => l.status !== 'running' && l.status !== 'stopped');
-      
-      // 判断后端服务器状态
+      const hasListenerWarning = listeners.some((l) => l.status === 'stopped');
+      const hasListenerAbnormal = listeners.some((l) => l.status !== 'running' && l.status !== 'stopped');
       const backendServers = slbDetails.backend_servers || [];
-      const hasBackendWarning = backendServers.some((s: any) => s.status === 'unavailable');
-      const hasBackendAbnormal = backendServers.some((s: any) => s.status === 'abnormal');
-      
-      // SLB 监听器卡片：只根据监听器状态
+      const hasBackendWarning = backendServers.some((s) => s.status === 'unavailable');
+      const hasBackendAbnormal = backendServers.some((s) => s.status === 'abnormal');
+
       if (!acc['SLB_Listener']) acc['SLB_Listener'] = [];
-      const listenerItem = { ...item };
-      if (hasListenerAbnormal) {
-        listenerItem.status = 'abnormal';
-      } else if (hasListenerWarning) {
-        listenerItem.status = 'warning';
-      } else {
-        listenerItem.status = 'normal';
-      }
+      const listenerItem: GroupedItem = {
+        ...item,
+        status: hasListenerAbnormal ? 'abnormal' : hasListenerWarning ? 'warning' : 'normal',
+      };
       acc['SLB_Listener'].push(listenerItem);
-      
-      // SLB 后端服务器卡片：只根据后端服务器状态
+
       if (!acc['SLB_Backend']) acc['SLB_Backend'] = [];
-      const backendItem = { ...item };
-      if (hasBackendAbnormal) {
-        backendItem.status = 'abnormal';
-      } else if (hasBackendWarning) {
-        backendItem.status = 'warning';
-      } else {
-        backendItem.status = 'normal';
-      }
+      const backendItem: GroupedItem = {
+        ...item,
+        status: hasBackendAbnormal ? 'abnormal' : hasBackendWarning ? 'warning' : 'normal',
+      };
       acc['SLB_Backend'].push(backendItem);
     } else {
       const type = item.resource_type;
       if (!acc[type]) acc[type] = [];
-      acc[type].push(item);
+      acc[type].push(item as GroupedItem);
     }
     return acc;
   }, {});
 
-  const getFilteredItems = (items: any[]) => {
+  const getFilteredItems = (items: GroupedItem[]): GroupedItem[] => {
     if (showMode === 'abnormal') return items.filter(i => i.status === 'abnormal');
     if (showMode === 'warning') return items.filter(i => i.status === 'abnormal' || i.status === 'warning');
     return items;
   };
 
-  const getResourceTypeStats = (items: any[]) => {
+  const getResourceTypeStats = (items: GroupedItem[]): ResourceTypeStats => {
     const total = items.length;
     const abnormal = items.filter(i => i.status === 'abnormal').length;
     const warning = items.filter(i => i.status === 'warning').length;
@@ -154,46 +156,45 @@ export default function InspectionDetail() {
   };
 
   const renderMetric = (value: number | null, threshold = 90) => {
-    if (value === null) return <span style={{ color: '#8c8c8c' }}>-</span>;
-    const color = value >= threshold ? '#dc2626' : value >= threshold - 10 ? '#f59e0b' : '#16a34a';
+    if (value === null) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
+    const color = value >= threshold ? 'var(--color-abnormal-text)' : value >= threshold - 10 ? 'var(--color-warning-text)' : 'var(--color-normal-text)';
     return <span style={{ color, fontWeight: 600, fontSize: 18 }}>{value.toFixed(1)}%</span>;
   };
 
-  const renderDiskDetails = (record: any) => {
-    let diskDetails = safeParseJSON(record.disk_details, []);
+  const renderDiskDetails = (record: InspectionResult) => {
+    const diskDetails = safeParseJSON<DiskDetail[]>(record.disk_details, []);
     const filterPrefixes = ['/var/lib/container', '/var/lib/kubelet', '/var/lib/docker', '/run/container'];
-    const expandedDisks: any[] = [];
+    const expandedDisks: DiskDetail[] = [];
     for (const disk of diskDetails) {
       const names = disk.device?.split(',').map((s: string) => s.trim()) || [];
       for (const name of names) {
         if (name && name.startsWith('/')) expandedDisks.push({ device: name, usage: disk.usage });
       }
     }
-    const filteredDisks = expandedDisks.filter((disk: any) => !filterPrefixes.some(prefix => disk.device?.startsWith(prefix)));
-    if (filteredDisks.length === 0) return record.disk_usage !== null ? renderMetric(record.disk_usage) : <span style={{ color: '#8c8c8c' }}>-</span>;
+    const filteredDisks = expandedDisks.filter((disk) => !filterPrefixes.some(prefix => disk.device?.startsWith(prefix)));
+    if (filteredDisks.length === 0) return record.disk_usage !== null ? renderMetric(record.disk_usage) : <span style={{ color: 'var(--color-muted)' }}>-</span>;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {filteredDisks.map((disk: any, idx: number) => (
+        {filteredDisks.map((disk, idx) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#8c8c8c', fontSize: 12, minWidth: 80 }}>{disk.device}</span>
-            <Progress percent={Math.round(disk.usage)} size="small" strokeColor={disk.usage > 90 ? '#dc2626' : disk.usage > 70 ? '#f59e0b' : '#16a34a'} style={{ flex: 1, marginBottom: 0 }} />
+            <span style={{ color: 'var(--color-muted)', fontSize: 12, minWidth: 80 }}>{disk.device}</span>
+            <Progress percent={Math.round(disk.usage)} size="small" strokeColor={disk.usage > 90 ? 'var(--color-abnormal-text)' : disk.usage > 70 ? 'var(--color-warning-text)' : 'var(--color-normal-text)'} style={{ flex: 1, marginBottom: 0 }} />
           </div>
         ))}
       </div>
     );
   };
 
-  const renderSlbListenerItems = (record: any) => {
-    let slbDetails = safeParseJSON(record.disk_details, {});
+  const renderSlbListenerItems = (record: InspectionResult) => {
+    const slbDetails = safeParseJSON<{ listeners?: SlbListener[] }>(record.disk_details, {});
     let listeners = slbDetails.listeners || [];
-    // 异常或警告模式下，隐藏 running 状态的监听器
     if (showMode === 'abnormal' || showMode === 'warning') {
-      listeners = listeners.filter((l: any) => l.status !== 'running');
+      listeners = listeners.filter((l) => l.status !== 'running');
     }
-    if (listeners.length === 0) return <span style={{ color: '#8c8c8c' }}>-</span>;
+    if (listeners.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {listeners.map((listener: any, idx: number) => (
+        {listeners.map((listener, idx) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{listener.protocol}:{listener.port}</span>
             <Tag color={listener.status === 'running' ? 'success' : listener.status === 'stopped' ? 'warning' : 'error'} style={{ margin: 0, fontSize: 11 }}>
@@ -205,17 +206,16 @@ export default function InspectionDetail() {
     );
   };
 
-  const renderSlbBackendItems = (record: any) => {
-    let slbDetails = safeParseJSON(record.disk_details, {});
+  const renderSlbBackendItems = (record: InspectionResult) => {
+    const slbDetails = safeParseJSON<{ backend_servers?: SlbBackendServer[] }>(record.disk_details, {});
     let backendServers = slbDetails.backend_servers || [];
-    // 异常或警告模式下，隐藏 normal 状态的后端服务器
     if (showMode === 'abnormal' || showMode === 'warning') {
-      backendServers = backendServers.filter((s: any) => s.status !== 'normal');
+      backendServers = backendServers.filter((s) => s.status !== 'normal');
     }
-    if (backendServers.length === 0) return <span style={{ color: '#8c8c8c' }}>-</span>;
+    if (backendServers.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {backendServers.map((server: any, idx: number) => (
+        {backendServers.map((server, idx) => (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{server.serverIp}:{server.port}</span>
             <Tag color={server.status === 'normal' ? 'success' : server.status === 'unavailable' ? 'warning' : 'error'} style={{ margin: 0, fontSize: 11 }}>
@@ -225,6 +225,18 @@ export default function InspectionDetail() {
         ))}
       </div>
     );
+  };
+
+  const statusBg = (status: string) => {
+    if (status === 'abnormal') return 'var(--color-abnormal-bg)';
+    if (status === 'warning') return 'var(--color-warning-bg)';
+    return 'var(--color-normal-bg)';
+  };
+
+  const statusBorder = (status: string) => {
+    if (status === 'abnormal') return 'var(--color-abnormal-border)';
+    if (status === 'warning') return 'var(--color-warning-border)';
+    return 'transparent';
   };
 
   return (
@@ -246,7 +258,7 @@ export default function InspectionDetail() {
       </div>
 
       {task && (
-        <Card style={{ marginBottom: 24, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none' }}>
+        <Card style={{ marginBottom: 24, background: 'var(--color-card-summary-bg)', border: 'none' }}>
           <Row gutter={[32, 16]} style={{ color: 'white' }}>
             <Col span={3}><div style={{ opacity: 0.8, marginBottom: 4 }}>触发方式</div><div style={{ fontSize: 20, fontWeight: 600 }}>{task.trigger_type === 'manual' ? '手动' : '定时'}</div></Col>
             <Col span={3}><div style={{ opacity: 0.8, marginBottom: 4 }}>巡检状态</div><div style={{ fontSize: 20, fontWeight: 600 }}>{task.status === 'completed' ? '已完成' : task.status === 'failed' ? '失败' : '进行中'}</div></Col>
@@ -259,9 +271,9 @@ export default function InspectionDetail() {
         </Card>
       )}
 
-      {/* 资源类型异常统计卡片 - 点击可跳转 */}
+      {/* 资源类型异常统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {Object.entries(groupedResults).map(([resourceType, items]: [string, any]) => {
+        {Object.entries(groupedResults).map(([resourceType, items]) => {
           const stats = getResourceTypeStats(items);
           const icon = RESOURCE_ICONS[resourceType] || <CloudServerOutlined />;
           const color = RESOURCE_COLORS[resourceType] || '#3b82f6';
@@ -276,41 +288,17 @@ export default function InspectionDetail() {
                   const el = document.getElementById(`resource-${resourceType}`);
                   el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
-                style={{
-                  cursor: 'pointer',
-                  borderLeft: `4px solid ${hasAbnormal ? '#ef4444' : '#22c55e'}`,
-                }}
+                style={{ cursor: 'pointer', borderLeft: `4px solid ${hasAbnormal ? 'var(--color-abnormal-border)' : 'var(--color-normal-text)'}` }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 8,
-                    background: `${color}15`, display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    color, fontSize: 18
-                  }}>{icon}</div>
+                  <div style={{ width: 40, height: 40, borderRadius: 8, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color, fontSize: 18 }}>{icon}</div>
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{label}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>总计</div>
-                    <div style={{ fontSize: 20, fontWeight: 700 }}>{stats.total}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>正常</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{stats.normal}</div>
-                  </div>
-                  {stats.warning > 0 && (
-                    <div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>警告</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: '#f59e0b' }}>{stats.warning}</div>
-                    </div>
-                  )}
-                  {stats.abnormal > 0 && (
-                    <div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>异常</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: '#dc2626' }}>{stats.abnormal}</div>
-                    </div>
-                  )}
+                  <div><div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 2 }}>总计</div><div style={{ fontSize: 20, fontWeight: 700 }}>{stats.total}</div></div>
+                  <div><div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 2 }}>正常</div><div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-normal-text)' }}>{stats.normal}</div></div>
+                  {stats.warning > 0 && <div><div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 2 }}>警告</div><div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-warning-text)' }}>{stats.warning}</div></div>}
+                  {stats.abnormal > 0 && <div><div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 2 }}>异常</div><div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-abnormal-text)' }}>{stats.abnormal}</div></div>}
                 </div>
               </Card>
             </Col>
@@ -318,7 +306,7 @@ export default function InspectionDetail() {
         })}
       </Row>
 
-      {Object.entries(groupedResults).map(([resourceType, items]: [string, any]) => {
+      {Object.entries(groupedResults).map(([resourceType, items]) => {
         const filteredItems = getFilteredItems(items);
         if (filteredItems.length === 0) return null;
         const stats = getResourceTypeStats(items);
@@ -334,7 +322,7 @@ export default function InspectionDetail() {
                 <div style={{ width: 40, height: 40, borderRadius: 8, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color, fontSize: 20 }}>{icon}</div>
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{label}</div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400 }}>{showMode === 'abnormal' ? `${filteredItems.length} 个异常实例` : `共 ${stats.total} 个实例`}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-muted)', fontWeight: 400 }}>{showMode === 'abnormal' ? `${filteredItems.length} 个异常实例` : `共 ${stats.total} 个实例`}</div>
                 </div>
               </div>
             }
@@ -345,7 +333,7 @@ export default function InspectionDetail() {
             </Space>}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr', gap: 16, padding: '8px 12px', background: '#f9fafb', borderRadius: '8px 8px 0 0', fontSize: 12, color: '#6b7280', fontWeight: 500, borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr', gap: 16, padding: '8px 12px', background: 'var(--color-table-header-bg)', borderRadius: '8px 8px 0 0', fontSize: 12, color: 'var(--color-muted)', fontWeight: 500, borderBottom: '1px solid var(--color-table-border)' }}>
                 <div>资源名称</div>
                 <div>实例ID</div>
                 <div>账号 / 地域</div>
@@ -354,17 +342,17 @@ export default function InspectionDetail() {
                 {!isSlbType && <div style={{ textAlign: 'center' }}>磁盘</div>}
                 <div style={{ textAlign: 'center' }}>状态</div>
               </div>
-              {filteredItems.map((item: any) => (
+              {filteredItems.map((item) => (
                 <div key={item.id} style={{
                   display: 'grid', gridTemplateColumns: isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr',
                   gap: 16, padding: '12px 16px',
-                  background: item.status === 'abnormal' ? '#fef2f2' : item.status === 'warning' ? '#fffbeb' : '#fff',
-                  borderBottom: '1px solid #e5e7eb',
-                  borderLeft: item.status === 'abnormal' ? '3px solid #ef4444' : item.status === 'warning' ? '3px solid #f59e0b' : '3px solid transparent',
+                  background: statusBg(item.status),
+                  borderBottom: '1px solid var(--color-table-border)',
+                  borderLeft: `3px solid ${statusBorder(item.status)}`,
                   alignItems: 'center'
                 }}>
                   <div style={{ fontWeight: 500 }}>{item.resource_name || '-'}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', fontFamily: 'monospace' }}>{item.resource_id}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{item.resource_id}</div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}><Tag style={{ margin: 0 }}>{getAccountName(item.account_id)}</Tag><Tag style={{ margin: 0 }}>{item.region}</Tag></div>
                   {resourceType === 'SLB_Listener' ? <div>{renderSlbListenerItems(item)}</div> : resourceType === 'SLB_Backend' ? <div>{renderSlbBackendItems(item)}</div> : <><div style={{ textAlign: 'center' }}>{renderMetric(item.cpu_usage)}</div><div style={{ textAlign: 'center' }}>{renderMetric(item.memory_usage)}</div><div style={{ textAlign: 'center' }}>{renderDiskDetails(item)}</div></>}
                   <div style={{ textAlign: 'center' }}>
