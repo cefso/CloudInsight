@@ -22,7 +22,7 @@ class CmsClientWrapper:
         },
         "acs_kvstore": {
             "name": "Redis",
-            "metrics": ["MemoryUsage"],
+            "metrics": ["MemoryUsage", "StandardMemoryUsage", "ShardingMemoryUsage", "SplitrwMemoryUsage"],
         },
     }
 

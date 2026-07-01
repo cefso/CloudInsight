@@ -55,11 +55,13 @@ def inspect_metrics(
                     elif value >= cpu_warning:
                         warning_metrics.append("CPU 使用率")
                 elif "memory" in metric_name.lower():
-                    memory_usage = value
-                    if value >= memory_threshold:
-                        abnormal_metrics.append("内存使用率")
-                    elif value >= memory_warning:
-                        warning_metrics.append("内存使用率")
+                    # 对于 Redis，多个内存指标取第一个有效值
+                    if memory_usage is None:
+                        memory_usage = value
+                        if value >= memory_threshold:
+                            abnormal_metrics.append("内存使用率")
+                        elif value >= memory_warning:
+                            warning_metrics.append("内存使用率")
                 elif "disk" in metric_name.lower():
                     disk_usage = value
                     disk_details = result_data.get("disks", [])
