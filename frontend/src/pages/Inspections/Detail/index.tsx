@@ -370,7 +370,21 @@ export default function InspectionDetail() {
                         <div style={{ fontWeight: 500 }}>{details.name as string || item.resource_name}</div>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{details.product as string || '-'}</div>
                         <div><Tag color={details.level === 'CRITICAL' ? 'error' : 'warning'} style={{ margin: 0 }}>{details.level as string}</Tag></div>
-                        <div style={{ fontSize: 12, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(details.content as string || '').substring(0, 60)}</div>
+                        <div>
+                          <Tooltip title={details.content as string}>
+                            <div style={{ 
+                              fontSize: 12, 
+                              color: 'var(--color-muted)', 
+                              maxWidth: 300,
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap',
+                              cursor: 'help'
+                            }}>
+                              {(details.content as string || '').substring(0, 50)}...
+                            </div>
+                          </Tooltip>
+                        </div>
                         <div></div>
                       </>
                     ) : isExpiration ? (
