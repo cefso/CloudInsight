@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -19,20 +18,6 @@ class CloudAccountUpdate(BaseModel):
     regions: Optional[list[str]] = None
     resource_types: Optional[list[str]] = None
     is_enabled: Optional[bool] = None
-
-
-class CloudAccountResponse(BaseModel):
-    id: int
-    name: str
-    access_key_id: str
-    regions: Optional[list[str]] = None
-    resource_types: Optional[list[str]] = None
-    is_enabled: bool
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class TestConnectionRequest(BaseModel):

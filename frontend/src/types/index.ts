@@ -37,6 +37,8 @@ export interface InspectionResult {
   memory_usage: number | null;
   disk_usage: number | null;
   disk_details: string | null;
+  slb_details: string | null;
+  expiration_details: string | null;
   status: 'normal' | 'warning' | 'abnormal';
   abnormal_metrics: string | null;
   inspected_at: string;
