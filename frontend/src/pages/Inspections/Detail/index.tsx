@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined, AlertOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
@@ -23,6 +23,7 @@ const RESOURCE_ICONS: Record<string, ReactNode> = {
   SLB_Listener: <ApiOutlined />,
   SLB_Backend: <ApiOutlined />,
   Expiration: <ClockCircleOutlined />,
+  SystemEvent: <AlertOutlined />,
 };
 
 const RESOURCE_COLORS: Record<string, string> = {
@@ -32,6 +33,7 @@ const RESOURCE_COLORS: Record<string, string> = {
   SLB_Listener: '#f59e0b',
   SLB_Backend: '#10b981',
   Expiration: '#ef4444',
+  SystemEvent: '#f97316',
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -41,6 +43,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   SLB_Listener: 'SLB 监听器',
   SLB_Backend: 'SLB 后端服务器',
   Expiration: '实例到期提醒',
+  SystemEvent: '系统事件',
 };
 
 interface GroupedItem extends InspectionResult {
@@ -321,7 +324,8 @@ export default function InspectionDetail() {
         const label = RESOURCE_LABELS[resourceType] || `${resourceType} 资源`;
         const isSlbType = resourceType === 'SLB_Listener' || resourceType === 'SLB_Backend';
         const isExpiration = resourceType === 'Expiration';
-        const gridCols = isExpiration ? '2fr 2fr 1.5fr 2fr 1fr' : isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr';
+        const isSystemEvent = resourceType === 'SystemEvent';
+        const gridCols = isSystemEvent ? '2fr 2fr 1fr 3fr 0.8fr' : isExpiration ? '2fr 2fr 1.5fr 2fr 1fr' : isSlbType ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr';
 
         return (
           <Card key={resourceType} id={`resource-${resourceType}`} style={{ marginBottom: 16, scrollMarginTop: 20 }}
@@ -342,12 +346,12 @@ export default function InspectionDetail() {
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 16, padding: '8px 12px', background: 'var(--color-table-header-bg)', borderRadius: '8px 8px 0 0', fontSize: 12, color: 'var(--color-muted)', fontWeight: 500, borderBottom: '1px solid var(--color-table-border)' }}>
-                <div>{isExpiration ? '产品' : '资源名称'}</div>
-                <div>{isExpiration ? '实例ID' : '实例ID'}</div>
-                <div>{isExpiration ? '地域' : '账号 / 地域'}</div>
-                <div style={{ textAlign: 'center' }}>{isExpiration ? '到期时间' : resourceType === 'SLB_Listener' ? '监听器状态' : resourceType === 'SLB_Backend' ? '后端服务器状态' : 'CPU'}</div>
-                {isExpiration ? <div style={{ textAlign: 'center' }}>剩余天数</div> : !isSlbType && <div style={{ textAlign: 'center' }}>内存</div>}
-                {!isSlbType && !isExpiration && <div style={{ textAlign: 'center' }}>磁盘</div>}
+                <div>{isSystemEvent ? '事件名称' : isExpiration ? '产品' : '资源名称'}</div>
+                <div>{isSystemEvent ? '产品' : isExpiration ? '实例ID' : '实例ID'}</div>
+                <div>{isSystemEvent ? '级别' : isExpiration ? '地域' : '账号 / 地域'}</div>
+                <div style={{ textAlign: 'center' }}>{isSystemEvent ? '事件内容' : isExpiration ? '到期时间' : resourceType === 'SLB_Listener' ? '监听器状态' : resourceType === 'SLB_Backend' ? '后端服务器状态' : 'CPU'}</div>
+                {isSystemEvent || isExpiration ? <div style={{ textAlign: 'center' }}>{isExpiration ? '剩余天数' : ''}</div> : !isSlbType && <div style={{ textAlign: 'center' }}>内存</div>}
+                {!isSlbType && !isExpiration && !isSystemEvent && <div style={{ textAlign: 'center' }}>磁盘</div>}
                 <div style={{ textAlign: 'center' }}>状态</div>
               </div>
               {filteredItems.map((item) => {
@@ -361,7 +365,15 @@ export default function InspectionDetail() {
                     borderLeft: `3px solid ${statusBorder(item.status)}`,
                     alignItems: 'center'
                   }}>
-                    {isExpiration ? (
+                    {isSystemEvent ? (
+                      <>
+                        <div style={{ fontWeight: 500 }}>{details.name as string || item.resource_name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{details.product as string || '-'}</div>
+                        <div><Tag color={details.level === 'CRITICAL' ? 'error' : 'warning'} style={{ margin: 0 }}>{details.level as string}</Tag></div>
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(details.content as string || '').substring(0, 60)}</div>
+                        <div></div>
+                      </>
+                    ) : isExpiration ? (
                       <>
                         <div style={{ fontWeight: 500 }}>{details.product_code as string || '-'}</div>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{item.resource_id}</div>
