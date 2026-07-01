@@ -297,7 +297,7 @@ export default function InspectionDetail() {
         const isSlb = resourceType === 'SLB_Listener' || resourceType === 'SLB_Backend';
         const isExp = resourceType === 'Expiration';
         const isEvt = resourceType === 'SystemEvent';
-        const gridCols = isEvt ? '1.5fr 1fr 0.8fr 3fr 0.8fr' : isExp ? '1.5fr 1.5fr 0.8fr 1.5fr 0.8fr' : isSlb ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr';
+        const gridCols = isEvt ? '1.5fr 1fr 0.8fr 3fr 0.8fr' : isExp ? '1.5fr 1.5fr 0.8fr 1.2fr 0.8fr 0.8fr' : isSlb ? '2fr 2fr 1.5fr 3fr 0.8fr' : '2fr 1.5fr 1fr 1fr 1fr 1fr 0.8fr';
 
         return (
           <Card key={resourceType} id={`resource-${resourceType}`} style={{ marginBottom: 16, scrollMarginTop: 20 }}
