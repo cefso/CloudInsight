@@ -48,21 +48,66 @@ class InspectionEngine:
                 self.db.commit()
                 return task
 
-            threshold = self.db.query(AlertThreshold).filter(AlertThreshold.is_default == True).first()
-            cpu_threshold = threshold.cpu_threshold if threshold else 90.0
-            memory_threshold = threshold.memory_threshold if threshold else 90.0
-            disk_threshold = threshold.disk_threshold if threshold else 90.0
-            cpu_warning = cpu_threshold - 10
-            memory_warning = memory_threshold - 10
-            disk_warning = disk_threshold - 10
+            # 获取阈值配置（按资源类型）
+            thresholds = {t.resource_type: t for t in self.db.query(AlertThreshold).all()}
+            global_threshold = thresholds.get("global")
+            
+            def get_thresholds(resource_type: str):
+                """获取指定资源类型的阈值，如果没有则使用全局默认"""
+                rt = thresholds.get(resource_type, global_threshold)
+                return {
+                    "cpu": rt.cpu_threshold if rt and rt.cpu_threshold else 90.0,
+                    "memory": rt.memory_threshold if rt and rt.memory_threshold else 90.0,
+                    "disk": rt.disk_threshold if rt and rt.disk_threshold else 90.0,
+                }
 
             total, normal, warning, abnormal = 0, 0, 0, 0
             for account in accounts:
-                result = self._inspect_account(task.id, account, cpu_threshold, memory_threshold, disk_threshold, cpu_warning, memory_warning, disk_warning)
+                # 巡检 ECS
+                ecs_th = get_thresholds("ECS")
+                result = self._inspect_account(
+                    task.id, account, "acs_ecs_dashboard", "ECS",
+                    ecs_th["cpu"], ecs_th["memory"], ecs_th["disk"],
+                    ecs_th["cpu"] - 10, ecs_th["memory"] - 10, ecs_th["disk"] - 10
+                )
                 total += result["total"]
                 normal += result["normal"]
                 warning += result["warning"]
                 abnormal += result["abnormal"]
+
+                # 巡检 RDS
+                rds_th = get_thresholds("RDS")
+                result = self._inspect_account(
+                    task.id, account, "acs_rds_dashboard", "RDS",
+                    rds_th["cpu"], rds_th["memory"], rds_th["disk"],
+                    rds_th["cpu"] - 10, rds_th["memory"] - 10, rds_th["disk"] - 10
+                )
+                total += result["total"]
+                normal += result["normal"]
+                warning += result["warning"]
+                abnormal += result["abnormal"]
+
+                # 巡检 Redis
+                redis_th = get_thresholds("Redis")
+                result = self._inspect_account(
+                    task.id, account, "acs_kvstore", "Redis",
+                    redis_th["cpu"], redis_th["memory"], redis_th["disk"],
+                    redis_th["cpu"] - 10, redis_th["memory"] - 10, redis_th["disk"] - 10
+                )
+                total += result["total"]
+                normal += result["normal"]
+                warning += result["warning"]
+                abnormal += result["abnormal"]
+
+                # 巡检 SLB
+                slb_result = self._inspect_account(
+                    task.id, account, "slb", "SLB",
+                    90.0, 90.0, 90.0, 80.0, 80.0, 80.0
+                )
+                total += slb_result["total"]
+                normal += slb_result["normal"]
+                warning += slb_result["warning"]
+                abnormal += slb_result["abnormal"]
 
                 exp_result = inspect_expiration(self.db, task.id, account, AliyunClient(account.access_key_id, crypto_service.decrypt(account.access_key_secret), "cn-hangzhou"))
                 total += exp_result["total"]
@@ -94,33 +139,40 @@ class InspectionEngine:
 
         return task
 
-    def _inspect_account(self, task_id: int, account: CloudAccount, cpu_threshold: float, memory_threshold: float, disk_threshold: float, cpu_warning: float, memory_warning: float, disk_warning: float) -> dict:
+    def _inspect_account(
+        self, task_id: int, account: CloudAccount, namespace: str, resource_type: str,
+        cpu_threshold: float, memory_threshold: float, disk_threshold: float,
+        cpu_warning: float, memory_warning: float, disk_warning: float
+    ) -> dict:
         ak = account.access_key_id
         sk = crypto_service.decrypt(account.access_key_secret)
         regions = json.loads(account.regions) if account.regions else ["cn-hangzhou"]
-        resource_types = json.loads(account.resource_types) if account.resource_types else list(RESOURCE_TYPE_NAMES.keys())
 
         total, normal, warning, abnormal = 0, 0, 0, 0
 
         for region in regions:
             client = AliyunClient(ak, sk, region)
-            for namespace in resource_types:
-                if namespace == "slb":
-                    result = inspect_slb(self.db, task_id, account.id, client, region)
-                    total += result["total"]
-                    normal += result["normal"]
-                    warning += result.get("warning", 0)
-                    abnormal += result["abnormal"]
-                    continue
-
-                result = inspect_metrics(
-                    self.db, task_id, account, client, region, namespace,
-                    cpu_threshold, memory_threshold, disk_threshold,
-                    cpu_warning, memory_warning, disk_warning,
-                )
+            
+            # SLB 巡检
+            if namespace == "slb":
+                result = inspect_slb(self.db, task_id, account.id, client, region)
                 total += result["total"]
                 normal += result["normal"]
-                warning += result["warning"]
+                warning += result.get("warning", 0)
                 abnormal += result["abnormal"]
+                continue
+
+            # 指标巡检（ECS/RDS/Redis）
+            result = inspect_metrics(
+                self.db, task_id, account, client, region, namespace,
+                cpu_threshold, memory_threshold, disk_threshold,
+                cpu_warning, memory_warning, disk_warning,
+            )
+            total += result["total"]
+            normal += result["normal"]
+            warning += result["warning"]
+            abnormal += result["abnormal"]
+
+        return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}
 
         return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}

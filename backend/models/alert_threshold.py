@@ -7,6 +7,7 @@ class AlertThreshold(Base):
     __tablename__ = "alert_thresholds"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    resource_type = Column(String(50), nullable=True, comment="资源类型: ECS/RDS/Redis/通用")
     name = Column(String(100), nullable=False, comment="阈值名称")
     cpu_threshold = Column(Float, default=90.0, comment="CPU 阈值 (%)")
     memory_threshold = Column(Float, default=90.0, comment="内存阈值 (%)")

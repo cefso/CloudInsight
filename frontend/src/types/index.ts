@@ -75,10 +75,11 @@ export interface DiskDetail {
 // 告警阈值
 export interface AlertThreshold {
   id: number;
+  resource_type: string;
   name: string;
-  cpu_threshold: number;
-  memory_threshold: number;
-  disk_threshold: number;
+  cpu_threshold: number | null;
+  memory_threshold: number | null;
+  disk_threshold: number | null;
   is_default: boolean;
   created_at: string;
 }

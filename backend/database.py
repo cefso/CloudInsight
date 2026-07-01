@@ -34,6 +34,13 @@ def _migrate_columns():
             cursor.execute("ALTER TABLE inspection_results ADD COLUMN slb_details TEXT")
         if "expiration_details" not in columns:
             cursor.execute("ALTER TABLE inspection_results ADD COLUMN expiration_details TEXT")
+        
+        # 为 alert_thresholds 添加 resource_type 列
+        cursor.execute("PRAGMA table_info(alert_thresholds)")
+        th_columns = {row[1] for row in cursor.fetchall()}
+        if "resource_type" not in th_columns:
+            cursor.execute("ALTER TABLE alert_thresholds ADD COLUMN resource_type VARCHAR(50)")
+        
         conn.commit()
         conn.close()
     except Exception:
