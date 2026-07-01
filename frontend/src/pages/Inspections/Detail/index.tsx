@@ -183,7 +183,6 @@ export default function InspectionDetail() {
             <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{(details.product as string) || '-'}</div>
             <div><Tag color={details.level === 'CRITICAL' ? 'error' : 'warning'} style={{ margin: 0 }}>{details.level as string}</Tag></div>
             <div style={{ maxHeight: 60, overflow: 'auto', fontSize: 11, color: 'var(--color-muted)', lineHeight: 1.4 }}>{(details.content as string) || '-'}</div>
-            <div></div>
           </>
         ) : isExp ? (
           <>
