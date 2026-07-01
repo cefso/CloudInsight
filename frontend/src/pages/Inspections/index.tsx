@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, message } from 'antd';
+import { Card, Table, Tag, Button, message, Select, Space } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getInspectionTasks } from '../../api/inspections';
+import { getAccounts } from '../../api/accounts';
 import PageHeader from '../../components/PageHeader';
 import StatusTag from '../../components/StatusTag';
 
@@ -13,111 +14,68 @@ export default function Inspections() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [filterTrigger, setFilterTrigger] = useState<string | undefined>(undefined);
+  const [filterAccount, setFilterAccount] = useState<number | undefined>(undefined);
 
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const data = await getInspectionTasks(page, 20);
-      setTasks(data.items || []);
-      setTotal(data.total || 0);
+      const data = await getInspectionTasks(page, 100);
+      let items = data.items || [];
+      // 前端筛选
+      if (filterTrigger) {
+        items = items.filter((t: any) => t.trigger_type === filterTrigger);
+      }
+      if (filterAccount) {
+        items = items.filter((t: any) => t.account_names?.some((n: string) => {
+          const acc = accounts.find(a => a.id === filterAccount);
+          return acc && n === acc.name;
+        }));
+      }
+      setTasks(items);
+      setTotal(items.length);
     } catch { message.error('获取失败'); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchTasks(); }, [page]);
+  const fetchAccounts = async () => {
+    try { setAccounts(await getAccounts()); } catch { /* ignore */ }
+  };
+
+  useEffect(() => { fetchAccounts(); }, []);
+  useEffect(() => { fetchTasks(); }, [page, filterTrigger, filterAccount, accounts]);
 
   const columns = [
-    {
-      title: '批次ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (id: number) => <Tag color="blue">#{id}</Tag>,
-    },
-    {
-      title: '巡检账号',
-      dataIndex: 'account_names',
-      key: 'accounts',
-      render: (names: string[]) => {
-        if (!names || names.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
-        return (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {names.map((name, idx) => <Tag key={idx}>{name}</Tag>)}
-          </div>
-        );
-      },
-    },
-    {
-      title: '触发方式',
-      dataIndex: 'trigger_type',
-      key: 'trigger_type',
-      render: (type: string) => <Tag>{type === 'manual' ? '手动' : '定时'}</Tag>,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => <StatusTag status={status} />,
-    },
-    {
-      title: '资源总数',
-      dataIndex: 'total_resources',
-      key: 'total',
-      render: (v: number) => <strong>{v}</strong>,
-    },
-    {
-      title: '正常',
-      dataIndex: 'normal_count',
-      key: 'normal',
-      render: (v: number) => <span style={{ color: 'var(--color-normal-text)' }}>{v}</span>,
-    },
-    {
-      title: '异常',
-      dataIndex: 'abnormal_count',
-      key: 'abnormal',
-      render: (v: number) => <span style={{ color: v > 0 ? 'var(--color-abnormal-text)' : 'var(--color-normal-text)' }}>{v}</span>,
-    },
-    {
-      title: '开始时间',
-      dataIndex: 'started_at',
-      key: 'started_at',
-      render: (t: string) => dayjs(t).format('YYYY-MM-DD HH:mm:ss'),
-    },
-    {
-      title: '完成时间',
-      dataIndex: 'completed_at',
-      key: 'completed_at',
-      render: (t: string) => t ? dayjs(t).format('YYYY-MM-DD HH:mm:ss') : '-',
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_: any, record: any) => (
-        <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/inspections/${record.id}`)}>
-          查看详情
-        </Button>
-      ),
-    },
+    { title: '批次ID', dataIndex: 'id', key: 'id', render: (id: number) => <Tag color="blue">#{id}</Tag> },
+    { title: '巡检账号', dataIndex: 'account_names', key: 'accounts', render: (names: string[]) => {
+      if (!names || names.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
+      return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{names.map((n, i) => <Tag key={i}>{n}</Tag>)}</div>;
+    }},
+    { title: '触发方式', dataIndex: 'trigger_type', key: 'trigger_type', render: (t: string) => <Tag color={t === 'manual' ? 'blue' : 'purple'}>{t === 'manual' ? '手动' : '定时'}</Tag> },
+    { title: '状态', dataIndex: 'status', key: 'status', render: (s: string) => <StatusTag status={s} /> },
+    { title: '资源总数', dataIndex: 'total_resources', key: 'total', render: (v: number) => <strong>{v}</strong> },
+    { title: '正常', dataIndex: 'normal_count', key: 'normal', render: (v: number) => <span style={{ color: 'var(--color-normal-text)' }}>{v}</span> },
+    { title: '异常', dataIndex: 'abnormal_count', key: 'abnormal', render: (v: number) => <span style={{ color: v > 0 ? 'var(--color-abnormal-text)' : 'var(--color-normal-text)' }}>{v}</span> },
+    { title: '开始时间', dataIndex: 'started_at', key: 'started_at', render: (t: string) => dayjs(t).format('YYYY-MM-DD HH:mm:ss') },
+    { title: '完成时间', dataIndex: 'completed_at', key: 'completed_at', render: (t: string) => t ? dayjs(t).format('YYYY-MM-DD HH:mm:ss') : '-' },
+    { title: '操作', key: 'action', render: (_: any, r: any) => <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/inspections/${r.id}`)}>查看详情</Button> },
   ];
 
   return (
     <div>
-      <PageHeader
-        breadcrumbs={[{ title: '巡检中心' }, { title: '巡检记录' }]}
-        title="巡检记录"
-      />
+      <PageHeader breadcrumbs={[{ title: '巡检中心' }, { title: '巡检记录' }]} title="巡检记录" />
       <Card>
-        <Table
-          columns={columns}
-          dataSource={tasks}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: page,
-            pageSize: 20,
-            total,
-            onChange: (p) => setPage(p),
-          }}
-        />
+        <div style={{ marginBottom: 16 }}>
+          <Space>
+            <Select allowClear placeholder="触发方式" style={{ width: 120 }} value={filterTrigger} onChange={setFilterTrigger}
+              options={[{ label: '手动', value: 'manual' }, { label: '定时', value: 'cron' }]} />
+            <Select allowClear placeholder="筛选账号" style={{ width: 160 }} value={filterAccount} onChange={setFilterAccount}
+              options={accounts.map(a => ({ label: a.name, value: a.id }))} />
+          </Space>
+        </div>
+        <Table columns={columns} dataSource={tasks} rowKey="id" loading={loading}
+          pagination={{ current: page, pageSize: 20, total, onChange: (p) => setPage(p) }} />
       </Card>
     </div>
   );
