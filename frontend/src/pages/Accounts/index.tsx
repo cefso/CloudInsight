@@ -79,6 +79,7 @@ export default function Accounts() {
         const nameMap: Record<string, string> = {
           acs_ecs_dashboard: 'ECS',
           acs_rds_dashboard: 'RDS',
+          acs_kvstore: 'Redis',
           slb: 'SLB',
         };
         return (

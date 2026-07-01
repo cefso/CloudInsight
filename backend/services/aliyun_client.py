@@ -8,6 +8,7 @@ from services.clients.bss_client import BssClientWrapper
 RESOURCE_TYPE_NAMES = {
     "acs_ecs_dashboard": "ECS",
     "acs_rds_dashboard": "RDS",
+    "acs_kvstore": "Redis",
     "slb": "SLB",
 }
 

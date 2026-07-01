@@ -14,6 +14,7 @@ const REGION_OPTIONS = [
 const RESOURCE_TYPE_OPTIONS = [
   { label: 'ECS（云服务器）', value: 'acs_ecs_dashboard' },
   { label: 'RDS（数据库）', value: 'acs_rds_dashboard' },
+  { label: 'Redis（缓存）', value: 'acs_kvstore' },
   { label: 'SLB（负载均衡）', value: 'slb' },
 ];
 

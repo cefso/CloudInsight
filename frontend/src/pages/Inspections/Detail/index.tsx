@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
@@ -19,6 +19,7 @@ import type {
 const RESOURCE_ICONS: Record<string, ReactNode> = {
   ECS: <CloudServerOutlined />,
   RDS: <DatabaseOutlined />,
+  Redis: <SaveOutlined />,
   SLB_Listener: <ApiOutlined />,
   SLB_Backend: <ApiOutlined />,
   Expiration: <ClockCircleOutlined />,
@@ -27,6 +28,7 @@ const RESOURCE_ICONS: Record<string, ReactNode> = {
 const RESOURCE_COLORS: Record<string, string> = {
   ECS: '#3b82f6',
   RDS: '#8b5cf6',
+  Redis: '#dc2626',
   SLB_Listener: '#f59e0b',
   SLB_Backend: '#10b981',
   Expiration: '#ef4444',
@@ -35,6 +37,7 @@ const RESOURCE_COLORS: Record<string, string> = {
 const RESOURCE_LABELS: Record<string, string> = {
   ECS: 'ECS 资源',
   RDS: 'RDS 资源',
+  Redis: 'Redis 资源',
   SLB_Listener: 'SLB 监听器',
   SLB_Backend: 'SLB 后端服务器',
   Expiration: '实例到期提醒',
