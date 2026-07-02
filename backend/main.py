@@ -8,6 +8,7 @@ from database import init_db
 from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig, AiConfig, AiReport, AiConversation  # noqa: F401 — 触发 SQLAlchemy 模型注册
 from routers import accounts, inspections, thresholds, cron, dashboard, ai
 from services.scheduler import task_scheduler
+from services.mcp_manager import mcp_manager
 
 # 配置日志
 logging.basicConfig(
@@ -22,6 +23,7 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     init_db()
     task_scheduler.start()
+    await mcp_manager.connect_all()
     yield
     task_scheduler.stop()
 
