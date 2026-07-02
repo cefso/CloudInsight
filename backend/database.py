@@ -1,6 +1,9 @@
+import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -24,7 +27,8 @@ def get_db():
 def _migrate_columns():
     """为已有表添加新列（SQLite ALTER TABLE）"""
     import sqlite3
-    db_path = settings.database_url.replace("sqlite:///", "")
+    from sqlalchemy.engine.url import make_url
+    db_path = make_url(settings.database_url).database or settings.database_url.replace("sqlite:///", "")
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -47,15 +51,18 @@ def _migrate_columns():
         if "account_ids" not in cron_columns:
             cursor.execute("ALTER TABLE cron_configs ADD COLUMN account_ids TEXT")
         
+        # AI 配置表会在 init_db() 的 create_all() 中自动创建，无需额外迁移
+
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"数据库列迁移失败: {e}", exc_info=True)
 
 def _migrate_expiration_data():
     """将旧的 Expiration 记录从 disk_details 迁移到 expiration_details"""
     import sqlite3
-    db_path = settings.database_url.replace("sqlite:///", "")
+    from sqlalchemy.engine.url import make_url
+    db_path = make_url(settings.database_url).database or settings.database_url.replace("sqlite:///", "")
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -70,8 +77,8 @@ def _migrate_expiration_data():
         )
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"数据迁移失败: {e}", exc_info=True)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
