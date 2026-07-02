@@ -25,10 +25,11 @@ export async function getInspectionResults(params: {
 }
 
 export async function exportResults(taskId?: number, format = 'excel'): Promise<Blob> {
-  return await api.get('/inspections/results/export', {
+  const response = await api.get('/inspections/results/export', {
     params: { task_id: taskId, format },
     responseType: 'blob',
-  }) as unknown as Blob;
+  });
+  return response as unknown as Blob;
 }
 
 export async function triggerInspection(accountIds?: number[]): Promise<{ task_id: number }> {

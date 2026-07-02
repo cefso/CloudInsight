@@ -1,8 +1,6 @@
 import api from './index';
 import type { DashboardStats } from '../types';
 
-export type { DashboardStats };
-
 export interface AbnormalResource {
   id: number;
   resource_type: string;
@@ -20,7 +18,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function getAbnormalResources(limit = 10, accountId?: number): Promise<AbnormalResource[]> {
-  const params: any = { limit };
+  const params: Record<string, number> = { limit };
   if (accountId) params.account_id = accountId;
   return await api.get('/dashboard/abnormal-resources', { params });
 }

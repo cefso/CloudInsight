@@ -1,8 +1,6 @@
 import api from './index';
 import type { CloudAccount } from '../types';
 
-export type { CloudAccount };
-
 export async function getAccounts(): Promise<CloudAccount[]> {
   return await api.get('/accounts');
 }

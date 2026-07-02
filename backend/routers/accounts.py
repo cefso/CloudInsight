@@ -66,8 +66,9 @@ def update_account(account_id: int, request: CloudAccountUpdate, db: Session = D
         account.name = request.name
     if request.access_key_id is not None and "***" not in request.access_key_id:
         account.access_key_id = request.access_key_id
-    if request.access_key_secret is not None and "***" not in request.access_key_secret:
-        account.access_key_secret = crypto_service.encrypt(request.access_key_secret)
+    if request.access_key_secret is not None:
+        if "***" not in request.access_key_secret:
+            account.access_key_secret = crypto_service.encrypt(request.access_key_secret)
     if request.regions is not None:
         account.regions = json.dumps(request.regions)
     if request.resource_types is not None:
@@ -103,6 +104,11 @@ def test_connection(account_id: int, db: Session = Depends(get_db)):
 
 @router.post("/test")
 def test_connection_direct(request: TestConnectionRequest):
+    # 限制直接测试接口：AK/SK 格式校验
+    if not request.access_key_id or len(request.access_key_id) < 10:
+        raise HTTPException(status_code=400, detail="access_key_id 格式不正确")
+    if not request.access_key_secret or len(request.access_key_secret) < 10:
+        raise HTTPException(status_code=400, detail="access_key_secret 格式不正确")
     client = AliyunClient(request.access_key_id, request.access_key_secret, request.region)
     result = client.test_connection()
     return success_response(data=result)

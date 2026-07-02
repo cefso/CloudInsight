@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { Card, Table, Button, Tag, Space, message, Popconfirm, Breadcrumb } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ApiOutlined } from '@ant-design/icons';
 import { getAccounts, deleteAccount, testConnection } from '../../api/accounts';
-import type { CloudAccount } from '../../api/accounts';
+import type { CloudAccount } from '../../types';
 import AccountForm from './Form';
 
 export default function Accounts() {
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [editingAccount, setEditingAccount] = useState<CloudAccount | null>(null);
 
   const fetchAccounts = async () => {
     setLoading(true);
@@ -22,7 +22,11 @@ export default function Accounts() {
     }
   };
 
-  useEffect(() => { fetchAccounts(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAccounts();
+    return () => controller.abort();
+  }, []);
 
   const handleDelete = async (id: number) => {
     try {
@@ -54,7 +58,7 @@ export default function Accounts() {
       title: 'AK',
       dataIndex: 'access_key_id',
       key: 'ak',
-      render: (ak: string) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{ak}</span>,
+      render: (ak: string) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{ak.length > 10 ? ak.slice(0, 6) + '****' + ak.slice(-4) : ak}</span>,
     },
     {
       title: '地域',
@@ -102,7 +106,7 @@ export default function Accounts() {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, r: CloudAccount) => (
+      render: (_: unknown, r: CloudAccount) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => { setEditingAccount(r); setFormVisible(true); }}>
             编辑

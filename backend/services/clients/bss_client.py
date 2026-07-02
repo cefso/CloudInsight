@@ -25,21 +25,32 @@ class BssClientWrapper:
         try:
             now = datetime.now(timezone.utc)
 
-            request = bss_models.QueryAvailableInstancesRequest(
-                page_num=1,
-                page_size=100
-            )
-            response = self._client.query_available_instances(request)
+            all_instances = []
+            page_num = 1
+            while True:
+                request = bss_models.QueryAvailableInstancesRequest(
+                    page_num=page_num,
+                    page_size=100
+                )
+                response = self._client.query_available_instances(request)
 
-            if response.status_code != 200 or not response.body:
-                return []
+                if response.status_code != 200 or not response.body:
+                    break
 
-            data = response.body.data
-            if not data or not data.instance_list:
+                data = response.body.data
+                if not data or not data.instance_list:
+                    break
+
+                all_instances.extend(data.instance_list)
+                if len(data.instance_list) < 100 or page_num * 100 >= (data.total_count or 0):
+                    break
+                page_num += 1
+
+            if not all_instances:
                 return []
 
             expiring = []
-            for inst in data.instance_list:
+            for inst in all_instances:
                 if not inst.end_time:
                     continue
                 if inst.renew_status == 'NotRenewal':

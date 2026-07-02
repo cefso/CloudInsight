@@ -5,8 +5,8 @@ import dayjs from 'dayjs';
 import { getDashboardStats, getAbnormalResources } from '../../api/dashboard';
 import { triggerInspection } from '../../api/inspections';
 import { getAccounts } from '../../api/accounts';
-import type { DashboardStats, AbnormalResource } from '../../api/dashboard';
-import type { CloudAccount } from '../../api/accounts';
+import type { AbnormalResource } from '../../api/dashboard';
+import type { DashboardStats, CloudAccount } from '../../types';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -38,9 +38,19 @@ export default function Dashboard() {
     try { setAccounts(await getAccounts()); } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchStats(); fetchAccounts(); fetchAbnormalResources(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchStats();
+    fetchAccounts();
+    fetchAbnormalResources();
+    return () => controller.abort();
+  }, []);
 
-  useEffect(() => { fetchAbnormalResources(filterAccountId); }, [filterAccountId]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAbnormalResources(filterAccountId);
+    return () => controller.abort();
+  }, [filterAccountId]);
 
   const getAccountName = (id: number) => accounts.find(a => a.id === id)?.name || `账号${id}`;
 
@@ -120,7 +130,7 @@ export default function Dashboard() {
           placeholder="选择账号"
           value={selectedAccountIds}
           onChange={setSelectedAccountIds}
-          options={accounts.map(a => ({ label: `${a.name} (${a.access_key_id})`, value: a.id }))}
+          options={accounts.map(a => ({ label: `${a.name} (${a.access_key_id.length > 10 ? a.access_key_id.slice(-4) : a.access_key_id})`, value: a.id }))}
         />
       </Modal>
     </div>

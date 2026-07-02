@@ -1,9 +1,12 @@
+import threading
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from models import AlertThreshold
 from schemas.inspection import ThresholdUpdate
 from utils.response import success_response
+
+_init_lock = threading.Lock()
 
 router = APIRouter(prefix="/api/thresholds", tags=["阈值配置"])
 
@@ -30,24 +33,25 @@ def _serialize_threshold(t: AlertThreshold) -> dict:
 
 
 def _init_default_thresholds(db: Session):
-    """初始化默认阈值配置"""
-    existing = db.query(AlertThreshold).count()
-    if existing == 0:
-        for rt in RESOURCE_TYPES:
-            threshold = AlertThreshold(
-                resource_type=rt["key"],
-                name=rt["name"],
-                cpu_threshold=90.0 if rt["has_cpu"] else None,
-                memory_threshold=90.0 if rt["has_memory"] else None,
-                disk_threshold=90.0 if rt["has_disk"] else None,
-                is_default=True,
-            )
-            db.add(threshold)
-        db.commit()
-    # 迁移：如果存在 global 记录则删除
-    elif db.query(AlertThreshold).filter(AlertThreshold.resource_type == "global").first():
-        db.query(AlertThreshold).filter(AlertThreshold.resource_type == "global").delete()
-        db.commit()
+    """初始化默认阈值配置（使用锁防止并发重复插入）"""
+    with _init_lock:
+        existing = db.query(AlertThreshold).count()
+        if existing == 0:
+            for rt in RESOURCE_TYPES:
+                threshold = AlertThreshold(
+                    resource_type=rt["key"],
+                    name=rt["name"],
+                    cpu_threshold=90.0 if rt["has_cpu"] else None,
+                    memory_threshold=90.0 if rt["has_memory"] else None,
+                    disk_threshold=90.0 if rt["has_disk"] else None,
+                    is_default=True,
+                )
+                db.add(threshold)
+            db.commit()
+        # 迁移：如果存在 global 记录则删除
+        elif db.query(AlertThreshold).filter(AlertThreshold.resource_type == "global").first():
+            db.query(AlertThreshold).filter(AlertThreshold.resource_type == "global").delete()
+            db.commit()
 
 
 @router.get("")

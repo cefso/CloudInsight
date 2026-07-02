@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Card, Form, InputNumber, Button, message, Breadcrumb, Space } from 'antd';
+import { Card, Form, InputNumber, Button, message, Breadcrumb, Space, Spin } from 'antd';
 import { getThresholds, updateThreshold } from '../../api/inspections';
 import { CloudServerOutlined, DatabaseOutlined, SaveOutlined } from '@ant-design/icons';
 import type { AlertThreshold } from '../../types';
 
-const RESOURCE_CONFIG: Record<string, { label: string; icon: any; color: string; hasCpu: boolean; hasMemory: boolean; hasDisk: boolean }> = {
+const RESOURCE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; hasCpu: boolean; hasMemory: boolean; hasDisk: boolean }> = {
   ECS: { label: 'ECS 云服务器', icon: <CloudServerOutlined />, color: '#3b82f6', hasCpu: true, hasMemory: true, hasDisk: true },
   RDS: { label: 'RDS 数据库', icon: <DatabaseOutlined />, color: '#8b5cf6', hasCpu: true, hasMemory: true, hasDisk: true },
   Redis: { label: 'Redis 缓存', icon: <SaveOutlined />, color: '#dc2626', hasCpu: false, hasMemory: true, hasDisk: false },
@@ -12,7 +12,7 @@ const RESOURCE_CONFIG: Record<string, { label: string; icon: any; color: string;
 
 const CARD_ORDER = ['ECS', 'RDS', 'Redis'];
 
-function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSave: (id: number, values: any) => Promise<void> }) {
+function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSave: (id: number, values: { cpu_threshold?: number; memory_threshold?: number; disk_threshold?: number }) => Promise<void> }) {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const config = RESOURCE_CONFIG[threshold.resource_type || 'ECS'] || RESOURCE_CONFIG.ECS;
@@ -27,8 +27,8 @@ function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSav
       setSaving(true);
       await onSave(threshold.id, values);
       message.success(`${config.label} 阈值已保存`);
-    } catch (e: any) {
-      if (e.message) message.error(e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message) message.error(e.message);
     } finally {
       setSaving(false);
     }
@@ -77,14 +77,14 @@ function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSav
           {config.hasCpu && (
             <>
               <Button size="small" onClick={() => {
-                const p: any = {};
+                const p: Record<string, number> = {};
                 if (config.hasCpu) p.cpu_threshold = 80;
                 if (config.hasMemory) p.memory_threshold = 80;
                 if (config.hasDisk) p.disk_threshold = 80;
                 form.setFieldsValue(p);
               }}>80%</Button>
               <Button size="small" onClick={() => {
-                const p: any = {};
+                const p: Record<string, number> = {};
                 if (config.hasCpu) p.cpu_threshold = 90;
                 if (config.hasMemory) p.memory_threshold = 90;
                 if (config.hasDisk) p.disk_threshold = 90;
@@ -100,7 +100,7 @@ function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSav
 
 export default function Thresholds() {
   const [thresholds, setThresholds] = useState<AlertThreshold[]>([]);
-  const [, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const fetchThresholds = async () => {
     setLoading(true);
@@ -111,9 +111,13 @@ export default function Thresholds() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchThresholds(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchThresholds();
+    return () => controller.abort();
+  }, []);
 
-  const handleSave = async (id: number, values: any) => {
+  const handleSave = async (id: number, values: { cpu_threshold?: number; memory_threshold?: number; disk_threshold?: number }) => {
     await updateThreshold(id, values);
     fetchThresholds();
   };
@@ -126,6 +130,7 @@ export default function Thresholds() {
   });
 
   return (
+    <Spin spinning={loading}>
     <div>
       <Breadcrumb items={[{ title: '配置中心' }, { title: '告警阈值' }]} style={{ marginBottom: 16 }} />
       <div style={{ marginBottom: 24 }}>
@@ -141,5 +146,6 @@ export default function Thresholds() {
         ))}
       </div>
     </div>
+    </Spin>
   );
 }

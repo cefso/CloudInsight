@@ -3,11 +3,12 @@ import { Card, Table, Button, Space, Modal, Form, Input, Switch, message, Popcon
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getCronConfigs, createCronConfig, updateCronConfig, deleteCronConfig } from '../../api/inspections';
 import { getAccounts } from '../../api/accounts';
+import type { CronConfig, CloudAccount } from '../../types';
 import PageHeader from '../../components/PageHeader';
 
 export default function Cron() {
-  const [configs, setConfigs] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [configs, setConfigs] = useState<CronConfig[]>([]);
+  const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -23,7 +24,12 @@ export default function Cron() {
     try { setAccounts(await getAccounts()); } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchConfigs(); fetchAccounts(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchConfigs();
+    fetchAccounts();
+    return () => controller.abort();
+  }, []);
 
   const handleCreate = async () => {
     try {
@@ -33,7 +39,7 @@ export default function Cron() {
       form.resetFields();
       setModalVisible(false);
       fetchConfigs();
-    } catch (e: any) { if (e.message) message.error(e.message); }
+    } catch (e: unknown) { if (e instanceof Error && e.message) message.error(e.message); }
   };
 
   const handleToggle = async (id: number, enabled: boolean) => {
@@ -56,10 +62,10 @@ export default function Cron() {
       if (!names || names.length === 0) return <Tag>全部账号</Tag>;
       return <Space size={4} wrap>{names.map((n, i) => <Tag key={i}>{n}</Tag>)}</Space>;
     }},
-    { title: '状态', dataIndex: 'is_enabled', key: 'enabled', render: (e: boolean, r: any) => <Switch checked={e} onChange={v => handleToggle(r.id, v)} /> },
+    { title: '状态', dataIndex: 'is_enabled', key: 'enabled', render: (e: boolean, r: CronConfig) => <Switch checked={e} onChange={v => handleToggle(r.id, v)} /> },
     { title: '上次运行', dataIndex: 'last_run_at', key: 'last', render: (t: string) => t || '-' },
     { title: '下次运行', dataIndex: 'next_run_at', key: 'next', render: (t: string) => t || '-' },
-    { title: '操作', key: 'action', render: (_: any, r: any) => <Popconfirm title="确定删除？" onConfirm={() => handleDelete(r.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm> },
+    { title: '操作', key: 'action', render: (_: unknown, r: CronConfig) => <Popconfirm title="确定删除？" onConfirm={() => handleDelete(r.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm> },
   ];
 
   return (

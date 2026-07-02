@@ -1,6 +1,6 @@
 import json
 import logging
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
 from database import SessionLocal
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class TaskScheduler:
     def __init__(self):
-        self.scheduler = AsyncIOScheduler()
+        self.scheduler = BackgroundScheduler()
         self._job_ids = {}
 
     def start(self):

@@ -5,16 +5,17 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getInspectionTasks } from '../../api/inspections';
 import { getAccounts } from '../../api/accounts';
+import type { InspectionTaskWithAccounts, CloudAccount } from '../../types';
 import PageHeader from '../../components/PageHeader';
 import StatusTag from '../../components/StatusTag';
 
 export default function Inspections() {
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<InspectionTaskWithAccounts[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [filterTrigger, setFilterTrigger] = useState<string | undefined>(undefined);
   const [filterAccount, setFilterAccount] = useState<number | undefined>(undefined);
 
@@ -22,13 +23,13 @@ export default function Inspections() {
     setLoading(true);
     try {
       const data = await getInspectionTasks(page, 100);
-      let items = data.items || [];
+      let items: InspectionTaskWithAccounts[] = (data.items || []) as InspectionTaskWithAccounts[];
       // 前端筛选
       if (filterTrigger) {
-        items = items.filter((t: any) => t.trigger_type === filterTrigger);
+        items = items.filter((t) => t.trigger_type === filterTrigger);
       }
       if (filterAccount) {
-        items = items.filter((t: any) => t.account_names?.some((n: string) => {
+        items = items.filter((t) => t.account_names?.some((n: string) => {
           const acc = accounts.find(a => a.id === filterAccount);
           return acc && n === acc.name;
         }));
@@ -43,8 +44,16 @@ export default function Inspections() {
     try { setAccounts(await getAccounts()); } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchAccounts(); }, []);
-  useEffect(() => { fetchTasks(); }, [page, filterTrigger, filterAccount, accounts]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAccounts();
+    return () => controller.abort();
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchTasks();
+    return () => controller.abort();
+  }, [page, filterTrigger, filterAccount]);
 
   const columns = [
     { title: '批次ID', dataIndex: 'id', key: 'id', render: (id: number) => <Tag color="blue">#{id}</Tag> },
@@ -59,7 +68,7 @@ export default function Inspections() {
     { title: '异常', dataIndex: 'abnormal_count', key: 'abnormal', render: (v: number) => <span style={{ color: v > 0 ? 'var(--color-abnormal-text)' : 'var(--color-normal-text)' }}>{v}</span> },
     { title: '开始时间', dataIndex: 'started_at', key: 'started_at', render: (t: string) => dayjs(t).format('YYYY-MM-DD HH:mm:ss') },
     { title: '完成时间', dataIndex: 'completed_at', key: 'completed_at', render: (t: string) => t ? dayjs(t).format('YYYY-MM-DD HH:mm:ss') : '-' },
-    { title: '操作', key: 'action', render: (_: any, r: any) => <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/inspections/${r.id}`)}>查看详情</Button> },
+    { title: '操作', key: 'action', render: (_: unknown, r: InspectionTaskWithAccounts) => <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/inspections/${r.id}`)}>查看详情</Button> },
   ];
 
   return (

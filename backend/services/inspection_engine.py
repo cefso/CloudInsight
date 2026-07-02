@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from models import CloudAccount, InspectionTask, InspectionResult, AlertThreshold
 from services.crypto import crypto_service
-from services.aliyun_client import AliyunClient, RESOURCE_TYPE_NAMES
+from services.aliyun_client import AliyunClient
 from services.inspectors.metric_inspector import inspect_metrics
 from services.inspectors.slb_inspector import inspect_slb
 from services.inspectors.expiration_inspector import inspect_expiration
@@ -172,7 +172,5 @@ class InspectionEngine:
             normal += result["normal"]
             warning += result["warning"]
             abnormal += result["abnormal"]
-
-        return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}
 
         return {"total": total, "normal": normal, "warning": warning, "abnormal": abnormal}

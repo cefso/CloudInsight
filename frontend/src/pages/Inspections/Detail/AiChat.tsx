@@ -8,6 +8,11 @@ import type { AiMessage, AiStreamEvent } from '../../../types';
 
 const { Text } = Typography;
 
+/** 过滤掉 <think>...</think> 标签及其内容 */
+function filterThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+}
+
 interface Props {
   taskId: number;
   open: boolean;
@@ -68,8 +73,6 @@ export default function AiChat({ taskId, open, onClose }: Props) {
       (event: AiStreamEvent) => {
         if (event.type === 'token' && event.content) {
           setStreaming(prev => prev + event.content);
-        } else if (event.type === 'tool_call') {
-          setStreaming(prev => prev + `\n\n> 调用工具: ${event.name}...\n\n`);
         } else if (event.type === 'done') {
           setLoading(false);
           setStreaming('');
@@ -126,7 +129,7 @@ export default function AiChat({ taskId, open, onClose }: Props) {
         </div>
       }
       placement="right"
-      width={400}
+      width={420}
       open={open}
       onClose={onClose}
       footer={
@@ -136,8 +139,9 @@ export default function AiChat({ taskId, open, onClose }: Props) {
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="输入问题..."
-            autoSize={{ minRows: 1, maxRows: 4 }}
+            autoSize={{ minRows: 1, maxRows: 3 }}
             disabled={loading}
+            style={{ flex: 1 }}
           />
           <Button
             type="primary"
@@ -152,33 +156,28 @@ export default function AiChat({ taskId, open, onClose }: Props) {
     >
       <div style={{ height: '100%', overflow: 'auto', padding: '0 0 16px 0' }}>
         {messages.length === 0 && !loading && (
-          <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#999' }}>
             <RobotOutlined style={{ fontSize: 48, marginBottom: 16 }} />
             <p>你好！我是 AI 巡检助手</p>
-            <p>你可以问我关于巡检结果的问题</p>
+            <p style={{ fontSize: 12 }}>你可以问我关于巡检结果的问题</p>
             <div style={{ marginTop: 16 }}>
-              <Text type="secondary">示例问题：</Text>
-              <div style={{ marginTop: 8 }}>
-                <Button
-                  size="small"
-                  style={{ marginBottom: 8 }}
-                  onClick={() => setInput('哪些 ECS 需要扩容？')}
-                >
-                  哪些 ECS 需要扩容？
-                </Button>
-                <Button
-                  size="small"
-                  style={{ marginBottom: 8 }}
-                  onClick={() => setInput('RDS 为什么磁盘告警？')}
-                >
-                  RDS 为什么磁盘告警？
-                </Button>
-                <Button
-                  size="small"
-                  onClick={() => setInput('整体健康状况如何？')}
-                >
-                  整体健康状况如何？
-                </Button>
+              <Text type="secondary" style={{ fontSize: 12 }}>示例问题：</Text>
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  '哪些 ECS 需要扩容？',
+                  'RDS 为什么磁盘告警？',
+                  '整体健康状况如何？',
+                  '有什么优化建议？',
+                ].map((q, i) => (
+                  <Button
+                    key={i}
+                    size="small"
+                    block
+                    onClick={() => setInput(q)}
+                  >
+                    {q}
+                  </Button>
+                ))}
               </div>
             </div>
           </div>
@@ -191,45 +190,75 @@ export default function AiChat({ taskId, open, onClose }: Props) {
               display: 'flex',
               justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
               marginBottom: 16,
+              padding: '0 12px',
             }}
           >
-            <div
-              style={{
+            {msg.role === 'user' ? (
+              <div style={{
                 maxWidth: '85%',
-                padding: '12px 16px',
+                padding: '8px 12px',
                 borderRadius: 12,
-                background: msg.role === 'user' ? '#1890ff' : '#f5f5f5',
-                color: msg.role === 'user' ? '#fff' : '#333',
-              }}
-            >
-              {msg.role === 'user' ? (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <UserOutlined />
-                  <span>{msg.content}</span>
-                </div>
-              ) : (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {msg.content || ''}
-                </ReactMarkdown>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {streaming && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
-            <div
-              style={{
-                maxWidth: '85%',
+                background: '#1890ff',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+                wordBreak: 'break-word',
+              }}>
+                <UserOutlined style={{ marginTop: 2 }} />
+                <span>{msg.content}</span>
+              </div>
+            ) : (
+              <div style={{
+                maxWidth: '90%',
                 padding: '12px 16px',
                 borderRadius: 12,
                 background: '#f5f5f5',
-              }}
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {streaming}
-              </ReactMarkdown>
-              <Spin size="small" />
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+              }}>
+                <RobotOutlined style={{ color: '#1890ff', marginTop: 4 }} />
+                <div style={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  wordBreak: 'break-word',
+                }}>
+                  <div className="ai-chat-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {filterThinkTags(msg.content || '')}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {streaming && filterThinkTags(streaming) && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16, padding: '0 12px' }}>
+            <div style={{
+              maxWidth: '90%',
+              padding: '12px 16px',
+              borderRadius: 12,
+              background: '#f5f5f5',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+            }}>
+              <RobotOutlined style={{ color: '#1890ff', marginTop: 4 }} />
+              <div style={{
+                flex: 1,
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+              }}>
+                <div className="ai-chat-content">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {filterThinkTags(streaming)}
+                  </ReactMarkdown>
+                </div>
+                <Spin size="small" style={{ marginTop: 8 }} />
+              </div>
             </div>
           </div>
         )}

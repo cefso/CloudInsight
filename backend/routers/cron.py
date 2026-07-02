@@ -1,6 +1,10 @@
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from apscheduler.triggers.cron import CronTrigger
+
+logger = logging.getLogger(__name__)
 from database import get_db
 from models import CronConfig, CloudAccount
 from schemas.inspection import CronConfigCreate, CronConfigUpdate
@@ -17,8 +21,8 @@ def _serialize_cron(c: CronConfig, db: Session = None) -> dict:
             ids = json.loads(c.account_ids)
             accounts = db.query(CloudAccount.name).filter(CloudAccount.id.in_(ids)).all()
             account_names = [a[0] for a in accounts]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"获取账号名称失败: {e}")
     return {
         "id": c.id,
         "name": c.name,
@@ -43,6 +47,10 @@ def create_cron_config(request: CronConfigCreate, db: Session = Depends(get_db))
     parts = request.cron_expression.split()
     if len(parts) != 5:
         raise HTTPException(status_code=400, detail="Cron 格式: 分 时 日 月 周")
+    try:
+        CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Cron 表达式无效: {e}")
     config = CronConfig(
         name=request.name,
         cron_expression=request.cron_expression,
@@ -64,6 +72,13 @@ def update_cron_config(config_id: int, request: CronConfigUpdate, db: Session = 
     if request.name is not None:
         config.name = request.name
     if request.cron_expression is not None:
+        parts = request.cron_expression.split()
+        if len(parts) != 5:
+            raise HTTPException(status_code=400, detail="Cron 格式: 分 时 日 月 周")
+        try:
+            CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Cron 表达式无效: {e}")
         config.cron_expression = request.cron_expression
     if request.account_ids is not None:
         config.account_ids = json.dumps(request.account_ids) if request.account_ids else None
