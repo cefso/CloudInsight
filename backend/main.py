@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 import logging
 from config import get_settings
 from database import init_db
-from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig
-from routers import accounts, inspections, thresholds, cron, dashboard
+from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig, AiConfig, AiReport, AiConversation  # noqa: F401 — 触发 SQLAlchemy 模型注册
+from routers import accounts, inspections, thresholds, cron, dashboard, ai
 from services.scheduler import task_scheduler
 
 # 配置日志
@@ -40,9 +40,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"未处理异常: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"code": 500, "message": str(exc), "data": None}
+        content={"code": 500, "message": "服务器内部错误，请稍后重试", "data": None}
     )
 
 app.add_middleware(
@@ -58,6 +59,7 @@ app.include_router(inspections.router)
 app.include_router(thresholds.router)
 app.include_router(cron.router)
 app.include_router(dashboard.router)
+app.include_router(ai.router)
 
 
 @app.get("/")
