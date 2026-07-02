@@ -13,3 +13,4 @@ alibabacloud-rds20140815>=1.0.0
 alibabacloud-bssopenapi20171214>=1.0.0
 apscheduler>=3.10.0
 openpyxl>=3.1.0
+openai>=1.0.0
