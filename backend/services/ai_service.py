@@ -9,7 +9,6 @@ from models.ai_report import AiReport
 from models.ai_conversation import AiConversation
 from models.inspection_result import InspectionResult
 from services.ai_config_service import AiConfigService
-from services.mcp_manager import mcp_manager
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class AiService:
         )
 
     def _get_inspection_context(self, task_id: int) -> str:
-        """获取巡检数据作为上下文"""
+        """获取巡检数据作为上下文（完整数据）"""
         results = self.db.query(InspectionResult).filter(
             InspectionResult.task_id == task_id
         ).all()
@@ -49,7 +48,8 @@ class AiService:
         for r in results:
             if r.resource_type not in by_type:
                 by_type[r.resource_type] = []
-            by_type[r.resource_type].append({
+            
+            item = {
                 "id": r.resource_id,
                 "name": r.resource_name,
                 "region": r.region,
@@ -57,22 +57,38 @@ class AiService:
                 "memory": r.memory_usage,
                 "disk": r.disk_usage,
                 "status": r.status,
-            })
+            }
+            
+            # 添加详细信息
+            if r.disk_details:
+                item["disk_details"] = r.disk_details
+            if r.slb_details:
+                item["slb_details"] = r.slb_details
+            if r.expiration_details:
+                item["expiration_details"] = r.expiration_details
+            if r.abnormal_metrics:
+                item["abnormal_metrics"] = r.abnormal_metrics
+            
+            by_type[r.resource_type].append(item)
 
-        context = f"""巡检任务 #{task_id} 数据摘要：
+        context = f"""巡检任务 #{task_id} 完整数据：
 - 总资源数: {total}
 - 正常: {normal}, 警告: {warning}, 异常: {abnormal}
 
-各资源类型详情：
 """
         for rtype, items in by_type.items():
-            context += f"\n{rtype} ({len(items)} 个):\n"
-            for item in items[:10]:  # 限制每个类型最多10条
-                context += (
-                    f"  - {item['name']} ({item['id']}): "
-                    f"CPU={item['cpu']}%, 内存={item['memory']}%, "
-                    f"磁盘={item['disk']}%, 状态={item['status']}\n"
-                )
+            context += f"## {rtype} ({len(items)} 个)\n"
+            for item in items:
+                context += f"- {item['name']} ({item['id']}): CPU={item['cpu']}%, 内存={item['memory']}%, 磁盘={item['disk']}%, 状态={item['status']}, 地域={item['region']}\n"
+                if 'disk_details' in item:
+                    context += f"  磁盘详情: {item['disk_details']}\n"
+                if 'slb_details' in item:
+                    context += f"  SLB详情: {item['slb_details']}\n"
+                if 'expiration_details' in item:
+                    context += f"  到期信息: {item['expiration_details']}\n"
+                if 'abnormal_metrics' in item:
+                    context += f"  异常指标: {item['abnormal_metrics']}\n"
+            context += "\n"
 
         return context
 
@@ -86,20 +102,22 @@ class AiService:
         config = self.config_service.get_decrypted_config()
         context = self._get_inspection_context(task_id)
 
-        system_prompt = """你是一个云资源巡检分析专家。根据巡检数据，生成详细的分析报告。
+        system_prompt = """你是一个云资源巡检分析专家。根据巡检数据，生成简洁的分析报告。
+
+要求：
+1. 只分析异常和警告的资源，忽略正常的
+2. 直接指出问题和解决方案
+3. 使用简洁的语言
 
 报告格式：
-## 巡检概览
-总结整体健康状况
+## 问题汇总
+列出所有异常和警告资源，一句话说明问题
 
-## 异常分析
-列出所有异常资源，分析可能的根因
+## 处理建议
+针对每个问题给出具体的操作建议
 
-## 优化建议
-针对每个异常给出具体的优化建议
-
-## 风险提示
-指出潜在的风险和需要关注的资源"""
+## 风险提醒
+需要立即处理的高风险项"""
 
         if focus:
             system_prompt += f"\n\n重点关注：{focus}"
@@ -164,7 +182,7 @@ class AiService:
                 "content": (
                     f"你是一个云资源巡检助手。用户正在查看巡检任务 #{task_id} 的结果。\n\n"
                     f"当前巡检数据：\n{context}\n\n"
-                    "你可以回答关于巡检结果的问题，也可以调用工具查询更多阿里云数据。"
+                    "请基于以上巡检数据回答用户的问题，给出专业的分析和建议。"
                 ),
             },
         ]
@@ -176,30 +194,18 @@ class AiService:
         # 添加当前用户消息
         messages.append({"role": "user", "content": message})
 
-        tools = mcp_manager.get_tools()
         full_content = ""
 
         try:
             stream = await client.chat.completions.create(
                 model=config["model"],
                 messages=messages,
-                tools=tools if tools else None,
                 max_tokens=config["max_tokens"],
                 stream=True,
             )
 
             async for chunk in stream:
                 delta = chunk.choices[0].delta
-
-                # 处理工具调用
-                if delta.tool_calls:
-                    for tool_call in delta.tool_calls:
-                        yield json.dumps({
-                            "type": "tool_call",
-                            "id": tool_call.id,
-                            "name": tool_call.function.name,
-                            "arguments": tool_call.function.arguments,
-                        }) + "\n"
 
                 # 处理文本内容
                 if delta.content:

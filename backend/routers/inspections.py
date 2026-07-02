@@ -26,7 +26,17 @@ def _run_inspection_background(account_ids, trigger_type, task_id):
         engine = InspectionEngine(db)
         engine.run_inspection(account_ids=account_ids, trigger_type=trigger_type, task_id=task_id)
     except Exception as e:
-        logger.error(f"巡检任务执行失败: {e}")
+        logger.error(f"巡检任务执行失败: {e}", exc_info=True)
+        # 确保失败任务不会永远停留在 running 状态
+        try:
+            task = db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
+            if task and task.status == "running":
+                task.status = "failed"
+                task.completed_at = datetime.now()
+                task.error_message = str(e)
+                db.commit()
+        except Exception:
+            logger.error(f"更新失败任务状态时出错: task_id={task_id}")
     finally:
         db.close()
 
@@ -80,20 +90,24 @@ def list_tasks(
     tasks = db.query(InspectionTask).order_by(desc(InspectionTask.started_at)).offset((page - 1) * page_size).limit(page_size).all()
     pages = (total + page_size - 1) // page_size
 
+    # 批量获取所有任务关联的账号名称，避免 N+1 查询
+    task_ids = [t.id for t in tasks]
+    task_account_map: dict[int, list[str]] = {}
+    if task_ids:
+        from sqlalchemy import func
+        account_rows = (
+            db.query(InspectionResult.task_id, CloudAccount.name)
+            .join(CloudAccount, InspectionResult.account_id == CloudAccount.id)
+            .filter(InspectionResult.task_id.in_(task_ids))
+            .distinct()
+            .all()
+        )
+        for task_id, name in account_rows:
+            task_account_map.setdefault(task_id, []).append(name)
+
     items = []
     for task in tasks:
-        # 获取该任务关联的账号名称
-        account_ids = db.query(InspectionResult.account_id).filter(
-            InspectionResult.task_id == task.id
-        ).distinct().all()
-        account_ids = [aid[0] for aid in account_ids]
-
-        account_names = []
-        if account_ids:
-            accounts = db.query(CloudAccount.name).filter(CloudAccount.id.in_(account_ids)).all()
-            account_names = [a[0] for a in accounts]
-
-        items.append(_serialize_task(task, account_names))
+        items.append(_serialize_task(task, task_account_map.get(task.id, [])))
 
     return success_response(data={
         "items": items,
@@ -161,25 +175,28 @@ def export_results(task_id: Optional[int] = None, output_format: str = Query("ex
         query = query.filter(InspectionResult.task_id == task_id)
     results = query.order_by(desc(InspectionResult.inspected_at)).all()
 
-    if output_format == "excel":
-        import openpyxl
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "巡检结果"
-        ws.append(["资源类型", "资源ID", "资源名称", "地域", "CPU使用率", "内存使用率", "磁盘使用率", "是否异常", "异常指标", "巡检时间"])
-        for r in results:
-            am = json.loads(r.abnormal_metrics) if r.abnormal_metrics else []
-            ws.append([
-                r.resource_type, r.resource_id, r.resource_name, r.region,
-                f"{r.cpu_usage:.1f}%" if r.cpu_usage else "-",
-                f"{r.memory_usage:.1f}%" if r.memory_usage else "-",
-                f"{r.disk_usage:.1f}%" if r.disk_usage else "-",
-                "是" if r.status in ["abnormal", "warning"] else "否",
-                ", ".join(am) if am else "-",
-                r.inspected_at.strftime("%Y-%m-%d %H:%M:%S")
-            ])
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename=inspection_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"})
+    if output_format != "excel":
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=400, content={"code": 400, "message": f"不支持的导出格式: {output_format}", "data": None})
+
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "巡检结果"
+    ws.append(["资源类型", "资源ID", "资源名称", "地域", "CPU使用率", "内存使用率", "磁盘使用率", "是否异常", "异常指标", "巡检时间"])
+    for r in results:
+        am = json.loads(r.abnormal_metrics) if r.abnormal_metrics else []
+        ws.append([
+            r.resource_type, r.resource_id, r.resource_name, r.region,
+            f"{r.cpu_usage:.1f}%" if r.cpu_usage else "-",
+            f"{r.memory_usage:.1f}%" if r.memory_usage else "-",
+            f"{r.disk_usage:.1f}%" if r.disk_usage else "-",
+            "是" if r.status in ["abnormal", "warning"] else "否",
+            ", ".join(am) if am else "-",
+            r.inspected_at.strftime("%Y-%m-%d %H:%M:%S") if r.inspected_at else "-"
+        ])
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=inspection_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"})

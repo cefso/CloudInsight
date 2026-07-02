@@ -12,7 +12,7 @@ export default function Header() {
         <span style={{ fontSize: 18, fontWeight: 700 }}>CloudInsight</span>
       </div>
       <Space size="middle">
-        <Input placeholder="搜索资源..." prefix={<SearchOutlined />} style={{ width: 220 }} />
+        <Input placeholder="搜索资源..." prefix={<SearchOutlined />} style={{ width: 220 }} disabled />
         <ThemeToggle />
         <Avatar icon={<UserOutlined />} />
       </Space>

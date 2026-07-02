@@ -17,7 +17,13 @@ api.interceptors.response.use(
     }
     return data.data;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // 可扩展：跳转登录页或显示无权限提示
+      console.warn(`请求被拒绝: ${error.response.status}`);
+    }
+    return Promise.reject(error);
+  }
 );
 
 export default api;

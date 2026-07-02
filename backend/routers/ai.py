@@ -41,7 +41,7 @@ async def test_connection(db: Session = Depends(get_db)):
 
 # ========== AI 分析报告 ==========
 
-@router.post("/analyze")
+@router.get("/analyze")
 async def analyze_inspection(
     task_id: int = Query(...),
     focus: str = Query(None),
@@ -105,7 +105,7 @@ def get_report(report_id: int, db: Session = Depends(get_db)):
 
 # ========== AI 对话 ==========
 
-@router.post("/chat")
+@router.get("/chat")
 async def chat(
     task_id: int = Query(...),
     message: str = Query(...),

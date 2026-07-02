@@ -1,1 +1,219 @@
 /* App styles - using antd themes */
+
+/* AI Report Markdown Styles */
+.ai-report-content {
+  line-height: 1.8;
+  font-size: 14px;
+  color: var(--ant-color-text, #0f172a);
+}
+
+.ai-report-content h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-top: 20px;
+  margin-bottom: 12px;
+  color: var(--ant-color-text, #0f172a);
+}
+
+.ai-report-content h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ant-color-border, #e2e8f0);
+  color: var(--ant-color-text, #0f172a);
+}
+
+.ai-report-content h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: var(--ant-color-text, #0f172a);
+}
+
+.ai-report-content p {
+  margin-bottom: 12px;
+}
+
+.ai-report-content ul,
+.ai-report-content ol {
+  padding-left: 24px;
+  margin-bottom: 12px;
+}
+
+.ai-report-content li {
+  margin-bottom: 6px;
+}
+
+.ai-report-content code {
+  background: var(--ant-color-bg-text-hover, #f5f5f5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+}
+
+.ai-report-content pre {
+  background: var(--ant-color-bg-text-hover, #f5f5f5);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.ai-report-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.ai-report-content blockquote {
+  border-left: 3px solid var(--ant-color-primary, #2563eb);
+  padding-left: 12px;
+  margin: 12px 0;
+  color: var(--ant-color-text-secondary, #64748b);
+}
+
+.ai-report-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.ai-report-content th,
+.ai-report-content td {
+  border: 1px solid var(--ant-color-border, #e2e8f0);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.ai-report-content th {
+  background: var(--ant-color-bg-text-hover, #f8fafc);
+  font-weight: 600;
+  color: var(--ant-color-text, #0f172a);
+}
+
+.ai-report-content td {
+  color: var(--ant-color-text, #0f172a);
+}
+
+.ai-report-content strong {
+  font-weight: 600;
+  color: var(--ant-color-text, #0f172a);
+}
+
+.ai-report-content hr {
+  border: none;
+  border-top: 1px solid var(--ant-color-border, #e2e8f0);
+  margin: 16px 0;
+}
+
+/* AI Chat Styles */
+.ai-chat-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.ai-chat-bubble-user {
+  background: var(--ant-color-primary, #2563eb);
+  color: #fff;
+}
+
+.ai-chat-bubble-assistant {
+  background: var(--ant-color-bg-text-hover, #f5f5f5);
+  color: var(--ant-color-text, #333);
+}
+
+.ai-chat-bubble-assistant p:last-child {
+  margin-bottom: 0;
+}
+
+/* AI Chat Drawer Content Styles */
+.ai-chat-content {
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.ai-chat-content p {
+  margin-bottom: 8px;
+}
+
+.ai-chat-content p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-chat-content h1,
+.ai-chat-content h2,
+.ai-chat-content h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.ai-chat-content ul,
+.ai-chat-content ol {
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+
+.ai-chat-content li {
+  margin-bottom: 4px;
+}
+
+.ai-chat-content code {
+  background: var(--ant-color-bg-text-hover, #f0f0f0);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.ai-chat-content pre {
+  background: var(--ant-color-bg-text-hover, #f0f0f0);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ai-chat-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.ai-chat-content blockquote {
+  border-left: 3px solid var(--ant-color-primary, #2563eb);
+  padding-left: 8px;
+  margin: 8px 0;
+  color: var(--ant-color-text-secondary, #666);
+}
+
+.ai-chat-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.ai-chat-content th,
+.ai-chat-content td {
+  border: 1px solid var(--ant-color-border, #e2e8f0);
+  padding: 4px 8px;
+  text-align: left;
+  word-break: break-word;
+}
+
+.ai-chat-content th {
+  background: var(--ant-color-bg-text-hover, #f8fafc);
+  font-weight: 600;
+}
