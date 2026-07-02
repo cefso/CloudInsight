@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined, AlertOutlined } from '@ant-design/icons';
+import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented, Spin } from 'antd';
+import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined, AlertOutlined, MessageOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
 import { getAccounts } from '../../../api/accounts';
 import type { InspectionResult, InspectionTaskWithAccounts, CloudAccount, SlbListener, SlbBackendServer, DiskDetail, ResourceTypeStats } from '../../../types';
+import AiReport from './AiReport';
+import AiChat from './AiChat';
 
 const RESOURCE_ICONS: Record<string, ReactNode> = {
   ECS: <CloudServerOutlined />, RDS: <DatabaseOutlined />, Redis: <SaveOutlined />,
@@ -34,14 +36,31 @@ function safeParseJSON<T>(str: string | null, fallback: T): T {
   try { return JSON.parse(str) as T; } catch { return fallback; }
 }
 
+function ExpandableList<T>({ items, maxItems = 3, renderItem }: { items: T[]; maxItems?: number; renderItem: (item: T, idx: number) => ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  if (items.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
+  const visible = expanded ? items : items.slice(0, maxItems);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {visible.map((item, i) => renderItem(item, i))}
+      {items.length > maxItems && (
+        <a onClick={() => setExpanded(!expanded)} style={{ fontSize: 12, color: 'var(--color-primary)', cursor: 'pointer' }}>
+          {expanded ? '收起' : `还有 ${items.length - maxItems} 个...`}
+        </a>
+      )}
+    </div>
+  );
+}
+
 export default function InspectionDetail() {
   const { taskId } = useParams();
   const navigate = useNavigate();
   const [results, setResults] = useState<InspectionResult[]>([]);
   const [task, setTask] = useState<InspectionTaskWithAccounts | null>(null);
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
-  const [, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showMode, setShowMode] = useState<'all' | 'warning' | 'abnormal'>('abnormal');
+  const [chatOpen, setChatOpen] = useState(false);
 
   const fetchTask = async () => { try { const d = await getInspectionTasks(1, 100); const f = d.items?.find((t) => t.id === Number(taskId)); if (f) setTask(f as InspectionTaskWithAccounts); } catch {} };
   const fetchAccounts = async () => { try { setAccounts(await getAccounts()); } catch {} };
@@ -58,7 +77,13 @@ export default function InspectionDetail() {
     } catch { message.error('获取失败'); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchTask(); fetchAccounts(); fetchResults(); }, [taskId]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchTask();
+    fetchAccounts();
+    fetchResults();
+    return () => controller.abort();
+  }, [taskId]);
 
   const handleExport = async () => {
     try {
@@ -92,7 +117,6 @@ export default function InspectionDetail() {
     }
     return acc;
   }, {});
-
   const getFilteredItems = (items: GroupedItem[]) => {
     if (showMode === 'abnormal') return items.filter(i => i.status === 'abnormal');
     if (showMode === 'warning') return items.filter(i => i.status === 'abnormal' || i.status === 'warning');
@@ -136,21 +160,7 @@ export default function InspectionDetail() {
     );
   };
 
-  function ExpandableList({ items, maxItems = 3, renderItem }: { items: any[]; maxItems?: number; renderItem: (item: any, idx: number) => ReactNode }) {
-    const [expanded, setExpanded] = useState(false);
-    if (items.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
-    const visible = expanded ? items : items.slice(0, maxItems);
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {visible.map((item, i) => renderItem(item, i))}
-        {items.length > maxItems && (
-          <a onClick={() => setExpanded(!expanded)} style={{ fontSize: 12, color: 'var(--color-primary)', cursor: 'pointer' }}>
-            {expanded ? '收起' : `还有 ${items.length - maxItems} 个...`}
-          </a>
-        )}
-      </div>
-    );
-  }
+
 
   const renderSlbListenerItems = (record: InspectionResult) => {
     const slb = safeParseJSON<{ listeners?: SlbListener[] }>(record.slb_details, {});
@@ -223,6 +233,7 @@ export default function InspectionDetail() {
   };
 
   return (
+    <Spin spinning={loading}>
     <div>
       <Breadcrumb items={[{ title: '巡检中心' }, { title: <a onClick={() => navigate('/inspections')}>巡检记录</a> }, { title: `批次 #${taskId}` }]} style={{ marginBottom: 16 }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -231,12 +242,13 @@ export default function InspectionDetail() {
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>巡检报告 #{taskId}</h1>
         </Space>
         <Space>
-          <Segmented value={showMode} onChange={v => setShowMode(v as any)} options={[
+          <Segmented value={showMode} onChange={v => setShowMode(v as 'all' | 'warning' | 'abnormal')} options={[
             { label: '仅异常', value: 'abnormal', icon: <WarningOutlined /> },
             { label: '异常+警告', value: 'warning' },
             { label: '全部', value: 'all', icon: <FilterOutlined /> }
           ]} />
           <Button icon={<DownloadOutlined />} onClick={handleExport}>导出 Excel</Button>
+          <Button icon={<MessageOutlined />} onClick={() => setChatOpen(true)}>AI 助手</Button>
         </Space>
       </div>
 
@@ -254,10 +266,13 @@ export default function InspectionDetail() {
         </Card>
       )}
 
+      {/* AI 分析报告 */}
+      <AiReport taskId={Number(taskId)} />
+
       {/* 资源类型统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {Object.entries(groupedResults)
-          .sort(([a], [b]) => RESOURCE_ORDER.indexOf(a) - RESOURCE_ORDER.indexOf(b))
+          .sort(([a], [b]) => (RESOURCE_ORDER.indexOf(a) + 1 || Infinity) - (RESOURCE_ORDER.indexOf(b) + 1 || Infinity))
           .map(([resourceType, items]) => {
           const stats = getResourceTypeStats(items);
           const icon = RESOURCE_ICONS[resourceType] || <CloudServerOutlined />;
@@ -286,7 +301,7 @@ export default function InspectionDetail() {
 
       {/* 资源详情卡片 */}
       {Object.entries(groupedResults)
-        .sort(([a], [b]) => RESOURCE_ORDER.indexOf(a) - RESOURCE_ORDER.indexOf(b))
+        .sort(([a], [b]) => (RESOURCE_ORDER.indexOf(a) + 1 || Infinity) - (RESOURCE_ORDER.indexOf(b) + 1 || Infinity))
         .map(([resourceType, items]) => {
         const filteredItems = getFilteredItems(items);
         if (filteredItems.length === 0) return null;
@@ -331,6 +346,12 @@ export default function InspectionDetail() {
           </Card>
         );
       })}
+      <AiChat
+        taskId={Number(taskId)}
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+      />
     </div>
+    </Spin>
   );
 }
