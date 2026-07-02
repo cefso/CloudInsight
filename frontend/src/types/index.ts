@@ -89,6 +89,8 @@ export interface CronConfig {
   id: number;
   name: string;
   cron_expression: string;
+  account_ids: number[];
+  account_names: string[];
   is_enabled: boolean;
   last_run_at: string | null;
   next_run_at: string | null;
@@ -128,9 +130,43 @@ export interface ResourceTypeStats {
   normal: number;
 }
 
-// API 响应
-export interface ApiResponse<T = any> {
-  code: number;
-  message: string;
-  data: T;
+// ========== AI 相关类型 ==========
+
+export interface AiConfig {
+  id: number;
+  provider: 'dashscope' | 'openai' | 'ollama' | 'custom';
+  base_url: string;
+  api_key: string | null;
+  model: string;
+  max_tokens: number;
+  enabled: boolean;
 }
+
+export interface AiReport {
+  id: number;
+  task_id: number;
+  content: string;
+  model: string | null;
+  tokens_used: number | null;
+  created_at: string;
+}
+
+export interface AiMessage {
+  id: number;
+  task_id: number;
+  role: 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls: any | null;
+  created_at: string;
+}
+
+export interface AiStreamEvent {
+  type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error';
+  content?: string;
+  id?: string;
+  name?: string;
+  arguments?: string;
+  data?: any;
+  report_id?: number;
+}
+
