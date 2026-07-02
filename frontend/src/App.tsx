@@ -1,6 +1,6 @@
 import { ConfigProvider } from 'antd';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useTheme } from './hooks/useTheme';
+import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { darkTheme, lightTheme } from './styles/theme';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -9,8 +9,9 @@ import Inspections from './pages/Inspections';
 import InspectionDetail from './pages/Inspections/Detail';
 import Thresholds from './pages/Thresholds';
 import Cron from './pages/Cron';
+import AiConfig from './pages/Settings/AiConfig';
 
-function App() {
+function AppInner() {
   const { mode } = useTheme();
   return (
     <ConfigProvider theme={mode === 'dark' ? darkTheme : lightTheme}>
@@ -23,10 +24,19 @@ function App() {
             <Route path="inspections/:taskId" element={<InspectionDetail />} />
             <Route path="thresholds" element={<Thresholds />} />
             <Route path="cron" element={<Cron />} />
+            <Route path="settings/ai" element={<AiConfig />} />
           </Route>
         </Routes>
       </BrowserRouter>
     </ConfigProvider>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
   );
 }
 
