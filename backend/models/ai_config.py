@@ -1,10 +1,13 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, UniqueConstraint
 from sqlalchemy.sql import func
 from database import Base
 
 
 class AiConfig(Base):
     __tablename__ = "ai_config"
+    __table_args__ = (
+        UniqueConstraint("provider", name="uq_ai_config_provider"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     provider = Column(String(50), nullable=False, default="dashscope")

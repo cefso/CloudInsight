@@ -68,7 +68,7 @@ function ThresholdCard({ threshold, onSave }: { threshold: AlertThreshold; onSav
           </Form.Item>
         )}
 
-        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: 'var(--ant-color-text-tertiary)', marginBottom: 16 }}>
           <div>警告: ≥ 阈值-10% ｜ 异常: ≥ 阈值</div>
         </div>
 
@@ -112,9 +112,7 @@ export default function Thresholds() {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
     fetchThresholds();
-    return () => controller.abort();
   }, []);
 
   const handleSave = async (id: number, values: { cpu_threshold?: number; memory_threshold?: number; disk_threshold?: number }) => {

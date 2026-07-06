@@ -2,7 +2,7 @@ import json
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime
+from datetime import datetime, timezone
 from database import SessionLocal
 from models import CronConfig
 from services.inspection_engine import InspectionEngine
@@ -25,7 +25,7 @@ class TaskScheduler:
     def _load_jobs(self):
         db = SessionLocal()
         try:
-            configs = db.query(CronConfig).filter(CronConfig.is_enabled == True).all()
+            configs = db.query(CronConfig).filter(CronConfig.is_enabled.is_(True)).all()
             for config in configs:
                 self.add_job(config)
         finally:
@@ -63,7 +63,7 @@ class TaskScheduler:
         try:
             config = db.query(CronConfig).filter(CronConfig.id == config_id).first()
             if config:
-                config.last_run_at = datetime.now()
+                config.last_run_at = datetime.now(timezone.utc)
                 db.commit()
                 account_ids = json.loads(config.account_ids) if config.account_ids else None
             else:

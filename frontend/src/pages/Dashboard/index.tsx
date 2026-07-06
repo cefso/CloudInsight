@@ -39,17 +39,13 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
     fetchStats();
     fetchAccounts();
     fetchAbnormalResources();
-    return () => controller.abort();
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
     fetchAbnormalResources(filterAccountId);
-    return () => controller.abort();
   }, [filterAccountId]);
 
   const getAccountName = (id: number) => accounts.find(a => a.id === id)?.name || `账号${id}`;

@@ -25,11 +25,16 @@ export default function AiChat({ taskId, open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (open) {
       loadHistory();
     }
+    return () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
   }, [open, taskId]);
 
   useEffect(() => {
@@ -52,6 +57,8 @@ export default function AiChat({ taskId, open, onClose }: Props) {
   const handleSend = () => {
     if (!input.trim() || loading) return;
 
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     const userMessage = input.trim();
     setInput('');
     setLoading(true);
@@ -67,7 +74,7 @@ export default function AiChat({ taskId, open, onClose }: Props) {
     };
     setMessages(prev => [...prev, newUserMessage]);
 
-    chatWithAi(
+    cleanupRef.current = chatWithAi(
       taskId,
       userMessage,
       (event: AiStreamEvent) => {
@@ -113,7 +120,7 @@ export default function AiChat({ taskId, open, onClose }: Props) {
       title={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Space>
-            <RobotOutlined style={{ color: '#1890ff' }} />
+            <RobotOutlined style={{ color: 'var(--color-primary)' }} />
             <span>AI 助手</span>
           </Space>
           <Popconfirm
@@ -156,7 +163,7 @@ export default function AiChat({ taskId, open, onClose }: Props) {
     >
       <div style={{ height: '100%', overflow: 'auto', padding: '0 0 16px 0' }}>
         {messages.length === 0 && !loading && (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#999' }}>
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--ant-color-text-tertiary)' }}>
             <RobotOutlined style={{ fontSize: 48, marginBottom: 16 }} />
             <p>你好！我是 AI 巡检助手</p>
             <p style={{ fontSize: 12 }}>你可以问我关于巡检结果的问题</p>
@@ -198,7 +205,7 @@ export default function AiChat({ taskId, open, onClose }: Props) {
                 maxWidth: '85%',
                 padding: '8px 12px',
                 borderRadius: 12,
-                background: '#1890ff',
+                background: 'var(--color-primary)',
                 color: '#fff',
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -213,12 +220,12 @@ export default function AiChat({ taskId, open, onClose }: Props) {
                 maxWidth: '90%',
                 padding: '12px 16px',
                 borderRadius: 12,
-                background: '#f5f5f5',
+                background: 'var(--ant-color-bg-elevated)',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: 8,
               }}>
-                <RobotOutlined style={{ color: '#1890ff', marginTop: 4 }} />
+                <RobotOutlined style={{ color: 'var(--color-primary)', marginTop: 4 }} />
                 <div style={{
                   flex: 1,
                   overflow: 'hidden',
@@ -241,12 +248,12 @@ export default function AiChat({ taskId, open, onClose }: Props) {
               maxWidth: '90%',
               padding: '12px 16px',
               borderRadius: 12,
-              background: '#f5f5f5',
+              background: 'var(--ant-color-bg-elevated)',
               display: 'flex',
               alignItems: 'flex-start',
               gap: 8,
             }}>
-              <RobotOutlined style={{ color: '#1890ff', marginTop: 4 }} />
+              <RobotOutlined style={{ color: 'var(--color-primary)', marginTop: 4 }} />
               <div style={{
                 flex: 1,
                 overflow: 'hidden',

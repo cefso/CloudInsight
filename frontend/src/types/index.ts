@@ -36,11 +36,12 @@ export interface InspectionResult {
   cpu_usage: number | null;
   memory_usage: number | null;
   disk_usage: number | null;
-  disk_details: string | null;
-  slb_details: string | null;
-  expiration_details: string | null;
+  disk_details: DiskDetail[] | null;
+  slb_details: SlbDetails | null;
+  expiration_details: Record<string, unknown> | null;
+  event_details: Record<string, unknown> | null;
   status: 'normal' | 'warning' | 'abnormal';
-  abnormal_metrics: string | null;
+  abnormal_metrics: string[] | null;
   inspected_at: string;
 }
 
@@ -156,7 +157,7 @@ export interface AiMessage {
   task_id: number;
   role: 'user' | 'assistant' | 'tool';
   content: string | null;
-  tool_calls: any | null;
+  tool_calls: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -166,7 +167,7 @@ export interface AiStreamEvent {
   id?: string;
   name?: string;
   arguments?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   report_id?: number;
 }
 

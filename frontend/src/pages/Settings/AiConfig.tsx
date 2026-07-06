@@ -42,8 +42,13 @@ export default function AiConfigPage() {
       await updateAiConfig(values);
       message.success('配置已保存');
       loadConfig();
-    } catch (e: any) {
-      if (e.message) message.error(e.message);
+    } catch (e: unknown) {
+      const err = e as { errorFields?: { errors: string[] }[]; message?: string };
+      if (err.errorFields) {
+        // 表单验证失败，antd 会自动高亮，无需额外提示
+      } else if (err.message) {
+        message.error(err.message);
+      }
     } finally {
       setSaving(false);
     }

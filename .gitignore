@@ -1,6 +1,11 @@
 backend/inspection.db
+backend/inspection.db-wal
+backend/inspection.db-shm
+backend/inspection.db-journal
 backend/static/
 backend/.env
+backend/.env.local
+backend/.env.production
 backend/__pycache__/
 backend/*/__pycache__/
 backend/.venv/
@@ -9,3 +14,4 @@ frontend/dist/
 .compose/
 **/__pycache__/
 tmp/
+*.pyc

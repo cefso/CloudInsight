@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Optional
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["仪表盘"])
 
 @router.get("/stats")
 def get_dashboard_stats(db: Session = Depends(get_db)):
-    account_count = db.query(CloudAccount).filter(CloudAccount.is_enabled == True).count()
+    account_count = db.query(CloudAccount).filter(CloudAccount.is_enabled.is_(True)).count()
     last_task = db.query(InspectionTask).filter(InspectionTask.status == "completed").order_by(desc(InspectionTask.completed_at)).first()
 
     total_resources, normal_count, warning_count, abnormal_count = 0, 0, 0, 0
@@ -25,7 +25,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         abnormal_count = last_task.abnormal_count
         last_inspection_time = last_task.completed_at
 
-    next_cron = db.query(CronConfig).filter(CronConfig.is_enabled == True, CronConfig.next_run_at.isnot(None)).order_by(CronConfig.next_run_at).first()
+    next_cron = db.query(CronConfig).filter(CronConfig.is_enabled.is_(True), CronConfig.next_run_at.isnot(None)).order_by(CronConfig.next_run_at).first()
 
     stats = DashboardStats(
         total_resources=total_resources,
@@ -40,7 +40,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/abnormal-resources")
-def get_abnormal_resources(limit: int = 10, account_id: Optional[int] = None, db: Session = Depends(get_db)):
+def get_abnormal_resources(limit: int = Query(10, ge=1, le=100), account_id: Optional[int] = None, db: Session = Depends(get_db)):
     last_task = db.query(InspectionTask).filter(InspectionTask.status == "completed").order_by(desc(InspectionTask.completed_at)).first()
     if not last_task:
         return success_response(data=[])

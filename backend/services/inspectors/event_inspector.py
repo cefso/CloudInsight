@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from models import CloudAccount, InspectionResult
 from services.aliyun_client import AliyunClient
@@ -72,10 +72,11 @@ def inspect_system_events(
             disk_usage=None,
             disk_details=None,
             slb_details=None,
-            expiration_details=json.dumps(event_details),
+            expiration_details=None,
+            event_details=json.dumps(event_details),
             status=status,
             abnormal_metrics=json.dumps([f"[{level}] {product}: {name}"]),
-            inspected_at=datetime.now()
+            inspected_at=datetime.now(timezone.utc)
         )
         db.add(result)
 

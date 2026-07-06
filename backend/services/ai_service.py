@@ -187,12 +187,9 @@ class AiService:
             },
         ]
 
-        # 添加历史对话（最近10条）
+        # 添加历史对话（最近10条，已包含当前用户消息）
         for h in history[-10:]:
             messages.append({"role": h.role, "content": h.content})
-
-        # 添加当前用户消息
-        messages.append({"role": "user", "content": message})
 
         full_content = ""
 

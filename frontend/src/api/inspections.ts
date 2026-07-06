@@ -9,8 +9,12 @@ import type {
 
 // ========== 巡检任务 ==========
 
-export async function getInspectionTasks(page = 1, pageSize = 20): Promise<PaginatedResponse<InspectionTask>> {
-  return await api.get('/inspections/tasks', { params: { page, page_size: pageSize } });
+export async function getInspectionTasks(page = 1, pageSize = 20, filters?: { trigger_type?: string; account_id?: number }): Promise<PaginatedResponse<InspectionTask>> {
+  return await api.get('/inspections/tasks', { params: { page, page_size: pageSize, ...filters } });
+}
+
+export async function getInspectionTask(taskId: number): Promise<InspectionTask> {
+  return await api.get(`/inspections/tasks/${taskId}`);
 }
 
 export async function getInspectionResults(params: {

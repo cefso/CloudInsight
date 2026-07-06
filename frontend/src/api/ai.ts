@@ -1,5 +1,5 @@
 import api from './index';
-import type { AiConfig, AiReport, AiMessage } from '../types';
+import type { AiConfig, AiReport, AiMessage, AiStreamEvent } from '../types';
 
 // ========== AI 配置 ==========
 
@@ -40,7 +40,7 @@ export async function clearAiConversations(taskId: number): Promise<void> {
 export function analyzeInspection(
   taskId: number,
   focus: string | null,
-  onEvent: (event: any) => void,
+  onEvent: (event: AiStreamEvent) => void,
   onError: (error: string) => void
 ): () => void {
   const params = new URLSearchParams({ task_id: taskId.toString() });
@@ -72,33 +72,49 @@ export function analyzeInspection(
 export function chatWithAi(
   taskId: number,
   message: string,
-  onEvent: (event: any) => void,
+  onEvent: (event: AiStreamEvent) => void,
   onError: (error: string) => void
 ): () => void {
-  const params = new URLSearchParams({
-    task_id: taskId.toString(),
-    message,
-  });
+  const controller = new AbortController();
 
-  const eventSource = new EventSource(`/api/ai/chat?${params}`);
-
-  eventSource.onmessage = (e) => {
+  fetch(`/api/ai/chat?task_id=${taskId}&message=${encodeURIComponent(message)}`, {
+    method: 'POST',
+    signal: controller.signal,
+  }).then(async (response) => {
+    if (!response.ok) {
+      onError('连接失败');
+      return;
+    }
+    const reader = response.body?.getReader();
+    if (!reader) { onError('连接失败'); return; }
+    const decoder = new TextDecoder();
+    let buffer = '';
     try {
-      const data = JSON.parse(e.data);
-      onEvent(data);
-      if (data.type === 'done' || data.type === 'error') {
-        eventSource.close();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              onEvent(data);
+              if (data.type === 'done' || data.type === 'error') {
+                controller.abort();
+                return;
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
       }
     } catch (err) {
-      onError('解析响应失败');
-      eventSource.close();
+      if (!controller.signal.aborted) onError('连接中断');
     }
-  };
+  }).catch((err) => {
+    if (!controller.signal.aborted) onError('连接失败');
+  });
 
-  eventSource.onerror = () => {
-    onError('连接失败');
-    eventSource.close();
-  };
-
-  return () => eventSource.close();
+  return () => controller.abort();
 }

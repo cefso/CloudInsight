@@ -25,10 +25,8 @@ export default function Cron() {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
     fetchConfigs();
     fetchAccounts();
-    return () => controller.abort();
   }, []);
 
   const handleCreate = async () => {

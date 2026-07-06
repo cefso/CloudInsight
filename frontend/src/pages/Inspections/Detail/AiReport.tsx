@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Spin, message, Collapse, Tag } from 'antd';
 import { RobotOutlined, ReloadOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
@@ -21,9 +21,14 @@ export default function AiReport({ taskId }: Props) {
   const [reports, setReports] = useState<AiReportType[]>([]);
   const [currentReport, setCurrentReport] = useState<AiReportType | null>(null);
   const [visible, setVisible] = useState(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     loadReports();
+    return () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
   }, [taskId]);
 
   const loadReports = async () => {
@@ -41,11 +46,13 @@ export default function AiReport({ taskId }: Props) {
   };
 
   const handleAnalyze = () => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     setLoading(true);
     setContent('');
     setVisible(true);
 
-    analyzeInspection(
+    cleanupRef.current = analyzeInspection(
       taskId,
       null,
       (event: AiStreamEvent) => {
@@ -86,7 +93,7 @@ export default function AiReport({ taskId }: Props) {
     <Card
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <RobotOutlined style={{ color: '#1890ff' }} />
+          <RobotOutlined style={{ color: 'var(--color-primary)' }} />
           <span>AI 分析报告</span>
           {currentReport && (
             <Tag color="blue" style={{ marginLeft: 8 }}>
@@ -110,7 +117,7 @@ export default function AiReport({ taskId }: Props) {
       {loading && !content && (
         <div style={{ textAlign: 'center', padding: 40 }}>
           <Spin size="large" />
-          <p style={{ marginTop: 16, color: '#666' }}>AI 正在分析巡检数据...</p>
+          <p style={{ marginTop: 16, color: 'var(--ant-color-text-secondary)' }}>AI 正在分析巡检数据...</p>
         </div>
       )}
 
@@ -124,7 +131,7 @@ export default function AiReport({ taskId }: Props) {
       )}
 
       {!loading && !content && reports.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>
+        <div style={{ textAlign: 'center', padding: 20, color: 'var(--ant-color-text-tertiary)' }}>
           <p>正在生成分析报告...</p>
         </div>
       )}
@@ -146,7 +153,7 @@ export default function AiReport({ taskId }: Props) {
                       cursor: 'pointer',
                       borderRadius: 4,
                       marginBottom: 4,
-                      background: currentReport?.id === report.id ? '#e6f7ff' : 'transparent',
+                      background: currentReport?.id === report.id ? 'var(--color-primary-bg)' : 'transparent',
                     }}
                     onClick={() => {
                       setCurrentReport(report);
