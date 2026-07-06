@@ -4,7 +4,7 @@ import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segm
 import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined, AlertOutlined, MessageOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
-import { getInspectionResults, getInspectionTasks, exportResults } from '../../../api/inspections';
+import { getInspectionResults, getInspectionTask, exportResults } from '../../../api/inspections';
 import { getAccounts } from '../../../api/accounts';
 import type { InspectionResult, InspectionTaskWithAccounts, CloudAccount, SlbListener, SlbBackendServer, DiskDetail, ResourceTypeStats } from '../../../types';
 import AiReport from './AiReport';
@@ -31,9 +31,10 @@ const RESOURCE_ORDER = ['ECS', 'RDS', 'Redis', 'SLB_Listener', 'SLB_Backend', 'E
 interface GroupedItem extends InspectionResult { status: 'normal' | 'warning' | 'abnormal'; }
 type GroupedResults = Record<string, GroupedItem[]>;
 
-function safeParseJSON<T>(str: string | null, fallback: T): T {
-  if (!str) return fallback;
-  try { return JSON.parse(str) as T; } catch { return fallback; }
+function safeParseJSON<T>(value: unknown, fallback: T): T {
+  if (!value) return fallback;
+  if (typeof value === 'object') return value as T;
+  try { return JSON.parse(value as string) as T; } catch { return fallback; }
 }
 
 function ExpandableList<T>({ items, maxItems = 3, renderItem }: { items: T[]; maxItems?: number; renderItem: (item: T, idx: number) => ReactNode }) {
@@ -62,7 +63,7 @@ export default function InspectionDetail() {
   const [showMode, setShowMode] = useState<'all' | 'warning' | 'abnormal'>('abnormal');
   const [chatOpen, setChatOpen] = useState(false);
 
-  const fetchTask = async () => { try { const d = await getInspectionTasks(1, 100); const f = d.items?.find((t) => t.id === Number(taskId)); if (f) setTask(f as InspectionTaskWithAccounts); } catch {} };
+  const fetchTask = async () => { try { const t = await getInspectionTask(Number(taskId)); if (t) setTask(t as InspectionTaskWithAccounts); } catch {} };
   const fetchAccounts = async () => { try { setAccounts(await getAccounts()); } catch {} };
   const fetchResults = async () => {
     setLoading(true);
@@ -78,11 +79,9 @@ export default function InspectionDetail() {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
     fetchTask();
     fetchAccounts();
     fetchResults();
-    return () => controller.abort();
   }, [taskId]);
 
   const handleExport = async () => {

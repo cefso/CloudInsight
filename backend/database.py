@@ -38,6 +38,8 @@ def _migrate_columns():
             cursor.execute("ALTER TABLE inspection_results ADD COLUMN slb_details TEXT")
         if "expiration_details" not in columns:
             cursor.execute("ALTER TABLE inspection_results ADD COLUMN expiration_details TEXT")
+        if "event_details" not in columns:
+            cursor.execute("ALTER TABLE inspection_results ADD COLUMN event_details TEXT")
         
         # 为 alert_thresholds 添加 resource_type 列
         cursor.execute("PRAGMA table_info(alert_thresholds)")

@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from models import CloudAccount, InspectionResult
 from services.aliyun_client import AliyunClient
@@ -47,7 +47,7 @@ def inspect_expiration(
             }),
             status=status,
             abnormal_metrics=json.dumps([f"剩余 {inst['days_remaining']} 天到期"]),
-            inspected_at=datetime.now()
+            inspected_at=datetime.now(timezone.utc)
         )
         db.add(result)
 

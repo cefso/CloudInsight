@@ -15,27 +15,20 @@ export default function Inspections() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
   const [filterTrigger, setFilterTrigger] = useState<string | undefined>(undefined);
   const [filterAccount, setFilterAccount] = useState<number | undefined>(undefined);
 
-  const fetchTasks = async () => {
+  const fetchTasks = async (p: number, ps: number) => {
     setLoading(true);
     try {
-      const data = await getInspectionTasks(page, 100);
-      let items: InspectionTaskWithAccounts[] = (data.items || []) as InspectionTaskWithAccounts[];
-      // 前端筛选
-      if (filterTrigger) {
-        items = items.filter((t) => t.trigger_type === filterTrigger);
-      }
-      if (filterAccount) {
-        items = items.filter((t) => t.account_names?.some((n: string) => {
-          const acc = accounts.find(a => a.id === filterAccount);
-          return acc && n === acc.name;
-        }));
-      }
-      setTasks(items);
-      setTotal(items.length);
+      const filters: { trigger_type?: string; account_id?: number } = {};
+      if (filterTrigger) filters.trigger_type = filterTrigger;
+      if (filterAccount) filters.account_id = filterAccount;
+      const data = await getInspectionTasks(p, ps, filters);
+      setTasks((data.items || []) as InspectionTaskWithAccounts[]);
+      setTotal(data.total);
     } catch { message.error('获取失败'); }
     finally { setLoading(false); }
   };
@@ -45,15 +38,19 @@ export default function Inspections() {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
     fetchAccounts();
-    return () => controller.abort();
   }, []);
+
   useEffect(() => {
-    const controller = new AbortController();
-    fetchTasks();
-    return () => controller.abort();
-  }, [page, filterTrigger, filterAccount]);
+    setPage(1);
+    fetchTasks(1, pageSize);
+  }, [filterTrigger, filterAccount]);
+
+  const handlePageChange = (p: number, ps: number) => {
+    setPage(p);
+    setPageSize(ps);
+    fetchTasks(p, ps);
+  };
 
   const columns = [
     { title: '批次ID', dataIndex: 'id', key: 'id', render: (id: number) => <Tag color="blue">#{id}</Tag> },
@@ -84,7 +81,7 @@ export default function Inspections() {
           </Space>
         </div>
         <Table columns={columns} dataSource={tasks} rowKey="id" loading={loading}
-          pagination={{ current: page, pageSize: 20, total, onChange: (p) => setPage(p) }} />
+          pagination={{ current: page, pageSize, total, onChange: handlePageChange }} />
       </Card>
     </div>
   );

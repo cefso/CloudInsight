@@ -12,17 +12,22 @@ class SlbClientWrapper:
         self.region_id = region_id
 
     def list_instances(self) -> list:
-        """获取所有 SLB 实例"""
+        """获取所有 SLB 实例（分页）"""
         try:
-            request = slb_models.DescribeLoadBalancersRequest(
-                region_id=self.region_id,
-                page_size=100
-            )
-            response = self._client.describe_load_balancers(request)
-            if response.status_code == 200 and response.body:
+            all_instances = []
+            page_number = 1
+            while True:
+                request = slb_models.DescribeLoadBalancersRequest(
+                    region_id=self.region_id,
+                    page_size=100,
+                    page_number=page_number
+                )
+                response = self._client.describe_load_balancers(request)
+                if response.status_code != 200 or not response.body:
+                    break
                 load_balancers = response.body.load_balancers
                 if load_balancers and load_balancers.load_balancer:
-                    return [
+                    all_instances.extend([
                         {
                             "loadBalancerId": lb.load_balancer_id,
                             "loadBalancerName": lb.load_balancer_name or lb.load_balancer_id,
@@ -31,8 +36,11 @@ class SlbClientWrapper:
                             "addressType": lb.address_type,
                         }
                         for lb in load_balancers.load_balancer
-                    ]
-            return []
+                    ])
+                if not load_balancers or not load_balancers.load_balancer or len(load_balancers.load_balancer) < 100:
+                    break
+                page_number += 1
+            return all_instances
         except Exception as e:
             logger.error(f"获取 SLB 实例失败: {e}")
             return []

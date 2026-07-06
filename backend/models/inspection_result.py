@@ -24,6 +24,7 @@ class InspectionResult(Base):
     disk_details = Column(Text)  # JSON 格式存储多个磁盘信息
     slb_details = Column(Text)  # JSON: {listeners, backend_servers}
     expiration_details = Column(Text)  # JSON: {product_code, end_time, days_remaining}
+    event_details = Column(Text)  # JSON: {event_id, name, product, level, status, content, time}
     status = Column(String(20), default="normal")  # normal / warning / abnormal
     abnormal_metrics = Column(Text)
     inspected_at = Column(DateTime, nullable=False)

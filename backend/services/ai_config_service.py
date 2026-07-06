@@ -1,7 +1,7 @@
 import logging
 from sqlalchemy.orm import Session
 from models.ai_config import AiConfig
-from services.crypto import CryptoService
+from services.crypto import crypto_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ DEFAULT_CONFIGS = {
 class AiConfigService:
     def __init__(self, db: Session):
         self.db = db
-        self.crypto = CryptoService()
+        self.crypto = crypto_service
 
     def get_config(self) -> dict | None:
         config = self.db.query(AiConfig).first()

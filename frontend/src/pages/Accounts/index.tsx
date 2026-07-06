@@ -23,9 +23,7 @@ export default function Accounts() {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
     fetchAccounts();
-    return () => controller.abort();
   }, []);
 
   const handleDelete = async (id: number) => {

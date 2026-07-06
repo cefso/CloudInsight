@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from models import InspectionResult
 from services.aliyun_client import AliyunClient
@@ -106,7 +106,7 @@ def inspect_slb(
             slb_details=json.dumps(slb_details),
             status=status,
             abnormal_metrics=json.dumps(all_metrics) if all_metrics else None,
-            inspected_at=datetime.now()
+            inspected_at=datetime.now(timezone.utc)
         )
         db.add(result)
 

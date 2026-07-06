@@ -2,8 +2,8 @@ import json
 import io
 import logging
 import threading
-from datetime import datetime
-from fastapi import APIRouter, Depends, Query
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -32,7 +32,7 @@ def _run_inspection_background(account_ids, trigger_type, task_id):
             task = db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
             if task and task.status == "running":
                 task.status = "failed"
-                task.completed_at = datetime.now()
+                task.completed_at = datetime.now(timezone.utc)
                 task.error_message = str(e)
                 db.commit()
         except Exception:
@@ -47,7 +47,7 @@ def trigger_inspection(request: TriggerInspectionRequest, db: Session = Depends(
     task = InspectionTask(
         trigger_type="manual",
         status="running",
-        started_at=datetime.now()
+        started_at=datetime.now(timezone.utc)
     )
     db.add(task)
     db.commit()
@@ -83,11 +83,21 @@ def _serialize_task(task: InspectionTask, account_names: list[str] = None) -> di
 @router.get("/tasks")
 def list_tasks(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=50),
+    trigger_type: Optional[str] = None,
+    account_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    total = db.query(InspectionTask).count()
-    tasks = db.query(InspectionTask).order_by(desc(InspectionTask.started_at)).offset((page - 1) * page_size).limit(page_size).all()
+    query = db.query(InspectionTask)
+    if trigger_type:
+        query = query.filter(InspectionTask.trigger_type == trigger_type)
+    if account_id:
+        task_ids = db.query(InspectionResult.task_id).filter(
+            InspectionResult.account_id == account_id
+        ).distinct().subquery()
+        query = query.filter(InspectionTask.id.in_(task_ids))
+    total = query.count()
+    tasks = query.order_by(desc(InspectionTask.started_at)).offset((page - 1) * page_size).limit(page_size).all()
     pages = (total + page_size - 1) // page_size
 
     # 批量获取所有任务关联的账号名称，避免 N+1 查询
@@ -113,6 +123,22 @@ def list_tasks(
         "items": items,
         "total": total, "page": page, "page_size": page_size, "pages": pages
     })
+
+@router.get("/tasks/{task_id}")
+def get_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    account_names = []
+    account_rows = (
+        db.query(CloudAccount.name)
+        .join(InspectionResult, InspectionResult.account_id == CloudAccount.id)
+        .filter(InspectionResult.task_id == task_id)
+        .distinct()
+        .all()
+    )
+    account_names = [name for (name,) in account_rows]
+    return success_response(data=_serialize_task(task, account_names))
 
 @router.get("/results")
 def list_results(
@@ -156,9 +182,10 @@ def list_results(
             "cpu_usage": r.cpu_usage,
             "memory_usage": r.memory_usage,
             "disk_usage": r.disk_usage,
-            "disk_details": r.disk_details,
-            "slb_details": r.slb_details,
-            "expiration_details": r.expiration_details,
+            "disk_details": json.loads(r.disk_details) if r.disk_details else None,
+            "slb_details": json.loads(r.slb_details) if r.slb_details else None,
+            "expiration_details": json.loads(r.expiration_details) if r.expiration_details else None,
+            "event_details": json.loads(r.event_details) if hasattr(r, 'event_details') and r.event_details else None,
             "status": r.status,
             "abnormal_metrics": json.loads(r.abnormal_metrics) if r.abnormal_metrics else None,
             "inspected_at": r.inspected_at,
@@ -170,14 +197,16 @@ def list_results(
 
 @router.get("/results/export")
 def export_results(task_id: Optional[int] = None, output_format: str = Query("excel", alias="format"), db: Session = Depends(get_db)):
-    query = db.query(InspectionResult)
-    if task_id is not None:
-        query = query.filter(InspectionResult.task_id == task_id)
-    results = query.order_by(desc(InspectionResult.inspected_at)).all()
-
+    if not task_id:
+        raise HTTPException(status_code=400, detail="请指定 task_id")
     if output_format != "excel":
-        from fastapi.responses import JSONResponse
-        return JSONResponse(status_code=400, content={"code": 400, "message": f"不支持的导出格式: {output_format}", "data": None})
+        raise HTTPException(status_code=400, detail=f"不支持的导出格式: {output_format}")
+
+    query = db.query(InspectionResult).filter(InspectionResult.task_id == task_id)
+    total = query.count()
+    if total > 10000:
+        raise HTTPException(status_code=400, detail=f"导出数据量过大（{total} 条），请缩小范围")
+    results = query.order_by(desc(InspectionResult.inspected_at)).all()
 
     import openpyxl
     wb = openpyxl.Workbook()
@@ -185,7 +214,10 @@ def export_results(task_id: Optional[int] = None, output_format: str = Query("ex
     ws.title = "巡检结果"
     ws.append(["资源类型", "资源ID", "资源名称", "地域", "CPU使用率", "内存使用率", "磁盘使用率", "是否异常", "异常指标", "巡检时间"])
     for r in results:
-        am = json.loads(r.abnormal_metrics) if r.abnormal_metrics else []
+        try:
+            am = json.loads(r.abnormal_metrics) if r.abnormal_metrics else []
+        except (json.JSONDecodeError, TypeError):
+            am = []
         ws.append([
             r.resource_type, r.resource_id, r.resource_name, r.region,
             f"{r.cpu_usage:.1f}%" if r.cpu_usage else "-",
@@ -199,4 +231,4 @@ def export_results(task_id: Optional[int] = None, output_format: str = Query("ex
     wb.save(buffer)
     buffer.seek(0)
     return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=inspection_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"})
+        headers={"Content-Disposition": f"attachment; filename=inspection_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.xlsx"})

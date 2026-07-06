@@ -51,6 +51,12 @@ def create_cron_config(request: CronConfigCreate, db: Session = Depends(get_db))
         CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Cron 表达式无效: {e}")
+    if request.account_ids:
+        existing = db.query(CloudAccount.id).filter(CloudAccount.id.in_(request.account_ids)).all()
+        existing_ids = {a[0] for a in existing}
+        missing = set(request.account_ids) - existing_ids
+        if missing:
+            raise HTTPException(status_code=400, detail=f"账号不存在: {missing}")
     config = CronConfig(
         name=request.name,
         cron_expression=request.cron_expression,
@@ -81,6 +87,12 @@ def update_cron_config(config_id: int, request: CronConfigUpdate, db: Session = 
             raise HTTPException(status_code=400, detail=f"Cron 表达式无效: {e}")
         config.cron_expression = request.cron_expression
     if request.account_ids is not None:
+        if request.account_ids:
+            existing = db.query(CloudAccount.id).filter(CloudAccount.id.in_(request.account_ids)).all()
+            existing_ids = {a[0] for a in existing}
+            missing = set(request.account_ids) - existing_ids
+            if missing:
+                raise HTTPException(status_code=400, detail=f"账号不存在: {missing}")
         config.account_ids = json.dumps(request.account_ids) if request.account_ids else None
     if request.is_enabled is not None:
         config.is_enabled = request.is_enabled

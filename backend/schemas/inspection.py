@@ -9,9 +9,11 @@ class TriggerInspectionRequest(BaseModel):
 
 
 class ThresholdUpdate(BaseModel):
-    cpu_threshold: Optional[float] = Field(None, ge=0, le=100)
-    memory_threshold: Optional[float] = Field(None, ge=0, le=100)
-    disk_threshold: Optional[float] = Field(None, ge=0, le=100)
+    resource_type: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=100)
+    cpu_threshold: Optional[float] = Field(None, gt=0, le=100)
+    memory_threshold: Optional[float] = Field(None, gt=0, le=100)
+    disk_threshold: Optional[float] = Field(None, gt=0, le=100)
 
 
 class CronConfigCreate(BaseModel):

@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from alibabacloud_cms20190101.client import Client as CmsClient
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_cms20190101 import models as cms_models
@@ -102,40 +102,49 @@ class CmsClientWrapper:
             return {"value": None, "disks": []}
 
     def get_system_events(self, hours: int = 24, level: str = None) -> list:
-        """获取系统事件"""
+        """获取系统事件（分页）"""
         try:
-            from datetime import datetime, timedelta, timezone
             now = datetime.now(timezone.utc)
             start = int((now - timedelta(hours=hours)).timestamp() * 1000)
             end = int(now.timestamp() * 1000)
 
-            request = cms_models.DescribeSystemEventAttributeRequest()
-            request.start_time = str(start)
-            request.end_time = str(end)
-            request.page_size = 100
-            if level:
-                request.level = level
+            all_events = []
+            page_number = 1
+            while True:
+                request = cms_models.DescribeSystemEventAttributeRequest()
+                request.start_time = str(start)
+                request.end_time = str(end)
+                request.page_size = 100
+                request.page_number = page_number
+                if level:
+                    request.level = level
 
-            response = self._client.describe_system_event_attribute(request)
-            if response.status_code == 200 and response.body and response.body.system_events:
+                response = self._client.describe_system_event_attribute(request)
+                if response.status_code != 200 or not response.body or not response.body.system_events:
+                    break
                 events = response.body.system_events.system_event
-                if events:
-                    return [
-                        {
-                            "event_id": e.id,
-                            "name": e.name,
-                            "product": e.product,
-                            "level": e.level,
-                            "status": e.status,
-                            "resource_id": e.resource_id,
-                            "instance_name": e.instance_name or "",
-                            "region_id": e.region_id or "",
-                            "content": e.content or "",
-                            "time": e.time,
-                        }
-                        for e in events
-                    ]
-            return []
+                if not events:
+                    break
+                all_events.extend([
+                    {
+                        "event_id": e.id,
+                        "name": e.name,
+                        "product": e.product,
+                        "level": e.level,
+                        "status": e.status,
+                        "resource_id": e.resource_id,
+                        "instance_name": e.instance_name or "",
+                        "region_id": e.region_id or "",
+                        "content": e.content or "",
+                        "time": e.time,
+                    }
+                    for e in events
+                ])
+                if len(events) < 100:
+                    break
+                page_number += 1
+
+            return all_events
         except Exception as e:
             logger.error(f"获取系统事件失败: {e}")
             return []
@@ -149,7 +158,7 @@ class CmsClientWrapper:
                     return []
                 metric_name = metrics[0]
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             start_time = (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
             end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 

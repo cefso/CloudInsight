@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from database import get_db
+from schemas.ai_config import AiConfigUpdate
 from services.ai_service import AiService
 from services.ai_config_service import AiConfigService
 from utils.response import success_response
@@ -24,10 +25,10 @@ def get_config(db: Session = Depends(get_db)):
 
 
 @router.put("/config")
-def update_config(data: dict, db: Session = Depends(get_db)):
+def update_config(data: AiConfigUpdate, db: Session = Depends(get_db)):
     """更新 AI 配置"""
     service = AiConfigService(db)
-    config = service.update_config(data)
+    config = service.update_config(data.model_dump(exclude_none=True))
     return success_response(data=config, message="配置已更新")
 
 
@@ -105,7 +106,7 @@ def get_report(report_id: int, db: Session = Depends(get_db)):
 
 # ========== AI 对话 ==========
 
-@router.get("/chat")
+@router.post("/chat")
 async def chat(
     task_id: int = Query(...),
     message: str = Query(...),

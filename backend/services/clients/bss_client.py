@@ -20,7 +20,7 @@ class BssClientWrapper:
     # 排除不需要关注到期的产品码
     EXCLUDED_PRODUCT_CODES = {'mpsoftware-mt9-dt41'}
 
-    def get_expiring_instances(self, days_threshold: int = 15) -> list:
+    def get_expiring_instances(self, days_threshold: int = 15, expired_within_days: int = 7) -> list:
         """获取即将到期的实例列表"""
         try:
             now = datetime.now(timezone.utc)
@@ -64,7 +64,9 @@ class BssClientWrapper:
                     end_time = datetime.fromisoformat(end_time_str)
                     days_remaining = (end_time - now).days
 
-                    if 0 <= days_remaining <= days_threshold:
+                    if days_remaining < -expired_within_days:
+                        continue
+                    if days_remaining <= days_threshold:
                         expiring.append({
                             "instance_id": inst.instance_id,
                             "product_code": inst.product_code,
