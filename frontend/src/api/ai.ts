@@ -112,7 +112,7 @@ export function chatWithAi(
     } catch (err) {
       if (!controller.signal.aborted) onError('连接中断');
     }
-  }).catch((err) => {
+  }).catch(() => {
     if (!controller.signal.aborted) onError('连接失败');
   });
 

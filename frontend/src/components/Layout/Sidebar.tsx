@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layout, Menu } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { DashboardOutlined, CloudServerOutlined, AlertOutlined, SettingOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { DashboardOutlined, CloudServerOutlined, AlertOutlined, SettingOutlined } from '@ant-design/icons';
 
 const { Sider } = Layout;
 
