@@ -27,6 +27,8 @@ class CmsClientWrapper:
     }
 
     def __init__(self, config: open_api_models.Config, region_id: str):
+        # CMS 使用全局端点，不使用区域特定端点
+        config.endpoint = "metrics.aliyuncs.com"
         self._client = CmsClient(config)
         self.region_id = region_id
         self._ecs_helper = EcsClientWrapper(config, region_id)
