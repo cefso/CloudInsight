@@ -7,6 +7,9 @@ services:
       - ./backend/.env
     environment:
       - DATABASE_URL=sqlite:////app/data/inspection.db
+    dns:
+      - 223.5.5.5
+      - 8.8.8.8
     volumes:
       - backend-data:/app/data
     healthcheck:
