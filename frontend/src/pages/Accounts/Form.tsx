@@ -17,28 +17,11 @@ const REGION_OPTIONS = [
   { label: '华南3（广州）', value: 'cn-guangzhou' },
   { label: '西南1（成都）', value: 'cn-chengdu' },
   { label: '华中1（武汉）', value: 'cn-wuhan-lr' },
+  { label: '华东5（南京）', value: 'cn-nanjing' },
+  { label: '华东6（福州）', value: 'cn-fuzhou' },
   { label: '西北2（中卫）', value: 'cn-zhongwei' },
+  { label: '河南（郑州）', value: 'cn-zhengzhou-jva' },
   { label: '中国香港', value: 'cn-hongkong' },
-  // 亚太地区
-  { label: '新加坡', value: 'ap-southeast-1' },
-  { label: '马来西亚（吉隆坡）', value: 'ap-southeast-3' },
-  { label: '马来西亚（柔佛州）', value: 'ap-southeast-8' },
-  { label: '印度尼西亚（雅加达）', value: 'ap-southeast-5' },
-  { label: '菲律宾（马尼拉）', value: 'ap-southeast-6' },
-  { label: '泰国（曼谷）', value: 'ap-southeast-7' },
-  { label: '日本（东京）', value: 'ap-northeast-1' },
-  { label: '韩国（首尔）', value: 'ap-northeast-2' },
-  // 欧美地区
-  { label: '美国（硅谷）', value: 'us-west-1' },
-  { label: '美国（弗吉尼亚）', value: 'us-east-1' },
-  { label: '德国（法兰克福）', value: 'eu-central-1' },
-  { label: '英国（伦敦）', value: 'eu-west-1' },
-  { label: '法国（巴黎）', value: 'eu-west-2' },
-  // 中东地区
-  { label: '阿联酋（迪拜）', value: 'me-east-1' },
-  { label: '沙特（利雅得）', value: 'me-central-1' },
-  // 其他
-  { label: '墨西哥', value: 'na-south-1' },
 ];
 
 const RESOURCE_TYPE_OPTIONS = [

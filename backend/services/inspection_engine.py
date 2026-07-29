@@ -20,6 +20,33 @@ RESOURCE_TYPES = [
     ("acs_kvstore", "Redis"),
 ]
 
+# 各产品支持的区域（基于官方文档）
+# CMS（云监控）支持所有区域，RDS/Redis/SLB 各有不同
+RDS_SUPPORTED_REGIONS = {
+    "cn-beijing", "cn-chengdu", "cn-guangzhou", "cn-heyuan", "cn-hongkong",
+    "cn-huhehaote", "cn-qingdao", "cn-shanghai", "cn-shenzhen", "cn-wulanchabu", "cn-zhangjiakou"
+}
+
+REDIS_SUPPORTED_REGIONS = {
+    "cn-beijing", "cn-chengdu", "cn-fuzhou", "cn-guangzhou", "cn-hongkong",
+    "cn-huhehaote", "cn-nanjing", "cn-qingdao", "cn-shenzhen", "cn-wuhan-lr",
+    "cn-zhangjiakou", "cn-zhengzhou-jva"
+}
+
+SLB_SUPPORTED_REGIONS = {
+    "cn-beijing", "cn-chengdu", "cn-fuzhou", "cn-guangzhou", "cn-heyuan",
+    "cn-hongkong", "cn-huhehaote", "cn-nanjing", "cn-qingdao", "cn-shanghai",
+    "cn-shenzhen", "cn-wuhan-lr", "cn-wulanchabu", "cn-zhangjiakou",
+    "cn-zhengzhou-jva", "cn-zhongwei"
+}
+
+# 命名空间 → 支持的区域
+NAMESPACE_REGION_MAP = {
+    "acs_rds_dashboard": RDS_SUPPORTED_REGIONS,
+    "acs_kvstore": REDIS_SUPPORTED_REGIONS,
+    "slb": SLB_SUPPORTED_REGIONS,
+}
+
 
 class InspectionEngine:
     def __init__(self, db: Session):
@@ -129,7 +156,14 @@ class InspectionEngine:
     ) -> dict:
         ak = account.access_key_id
         sk = crypto_service.decrypt(account.access_key_secret)
-        regions = json.loads(account.regions) if account.regions else ["cn-hangzhou"]
+        all_regions = json.loads(account.regions) if account.regions else ["cn-hangzhou"]
+
+        # 按产品支持的区域过滤
+        supported_regions = NAMESPACE_REGION_MAP.get(namespace)
+        if supported_regions:
+            regions = [r for r in all_regions if r in supported_regions]
+        else:
+            regions = all_regions
 
         total, normal, warning, abnormal = 0, 0, 0, 0
 
