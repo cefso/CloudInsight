@@ -15,3 +15,5 @@ frontend/dist/
 **/__pycache__/
 tmp/
 *.pyc
+docs/
+.mimocode/
