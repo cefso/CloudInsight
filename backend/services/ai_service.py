@@ -102,7 +102,8 @@ class AiService:
         config = self.config_service.get_decrypted_config()
         context = self._get_inspection_context(task_id)
 
-        system_prompt = """你是一个云资源巡检分析专家。根据巡检数据，生成简洁的分析报告。
+        # 使用自定义提示词，如果没有配置则使用默认提示词
+        system_prompt = config.get("system_prompt") or """你是一个云资源巡检分析专家。根据巡检数据，生成简洁的分析报告。
 
 要求：
 1. 只分析异常和警告的资源，忽略正常的

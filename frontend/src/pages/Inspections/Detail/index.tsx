@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Tag, Button, Breadcrumb, message, Space, Row, Col, Progress, Segmented, Spin } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined, AlertOutlined, MessageOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DownloadOutlined, CheckCircleOutlined, WarningOutlined, CloudServerOutlined, DatabaseOutlined, FilterOutlined, ApiOutlined, ClockCircleOutlined, SaveOutlined, AlertOutlined, MessageOutlined, RobotOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { getInspectionResults, getInspectionTask, exportResults } from '../../../api/inspections';
@@ -62,6 +62,7 @@ export default function InspectionDetail() {
   const [loading, setLoading] = useState(false);
   const [showMode, setShowMode] = useState<'all' | 'warning' | 'abnormal'>('abnormal');
   const [chatOpen, setChatOpen] = useState(false);
+  const aiReportRef = useRef<HTMLDivElement>(null);
 
   const fetchTask = async () => { try { const t = await getInspectionTask(Number(taskId)); if (t) setTask(t as InspectionTaskWithAccounts); } catch {} };
   const fetchAccounts = async () => { try { setAccounts(await getAccounts()); } catch {} };
@@ -247,6 +248,18 @@ export default function InspectionDetail() {
             { label: '全部', value: 'all', icon: <FilterOutlined /> }
           ]} />
           <Button icon={<DownloadOutlined />} onClick={handleExport}>导出 Excel</Button>
+          <Button
+            icon={<RobotOutlined />}
+            onClick={() => {
+              // 先滚动，再触发分析
+              aiReportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('trigger-ai-analyze'));
+              }, 200);
+            }}
+          >
+            AI 分析
+          </Button>
           <Button icon={<MessageOutlined />} onClick={() => setChatOpen(true)}>AI 助手</Button>
         </Space>
       </div>
@@ -266,7 +279,9 @@ export default function InspectionDetail() {
       )}
 
       {/* AI 分析报告 */}
-      <AiReport taskId={Number(taskId)} />
+      <div ref={aiReportRef}>
+        <AiReport taskId={Number(taskId)} />
+      </div>
 
       {/* 资源类型统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>

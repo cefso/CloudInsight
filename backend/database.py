@@ -52,8 +52,12 @@ def _migrate_columns():
         cron_columns = {row[1] for row in cursor.fetchall()}
         if "account_ids" not in cron_columns:
             cursor.execute("ALTER TABLE cron_configs ADD COLUMN account_ids TEXT")
-        
-        # AI 配置表会在 init_db() 的 create_all() 中自动创建，无需额外迁移
+
+        # 为 ai_config 添加 system_prompt 列
+        cursor.execute("PRAGMA table_info(ai_config)")
+        ai_columns = {row[1] for row in cursor.fetchall()}
+        if "system_prompt" not in ai_columns:
+            cursor.execute("ALTER TABLE ai_config ADD COLUMN system_prompt TEXT")
 
         conn.commit()
         conn.close()

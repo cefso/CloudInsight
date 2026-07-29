@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from database import Base
 
@@ -15,6 +15,7 @@ class AiConfig(Base):
     api_key = Column(String(500))  # 加密存储
     model = Column(String(100), nullable=False)
     max_tokens = Column(Integer, default=4096)
+    system_prompt = Column(Text)  # 巡检报告分析提示词
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

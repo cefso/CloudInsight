@@ -37,6 +37,7 @@ class AiConfigService:
             "api_key": "***" if config.api_key else None,
             "model": config.model,
             "max_tokens": config.max_tokens,
+            "system_prompt": config.system_prompt,
             "enabled": config.enabled,
         }
 
@@ -51,6 +52,7 @@ class AiConfigService:
             "api_key": self.crypto.decrypt(config.api_key) if config.api_key else None,
             "model": config.model,
             "max_tokens": config.max_tokens,
+            "system_prompt": config.system_prompt,
             "enabled": config.enabled,
         }
 
@@ -70,6 +72,8 @@ class AiConfigService:
             config.model = data["model"]
         if "max_tokens" in data:
             config.max_tokens = data["max_tokens"]
+        if "system_prompt" in data:
+            config.system_prompt = data["system_prompt"]
         if "enabled" in data:
             config.enabled = data["enabled"]
 

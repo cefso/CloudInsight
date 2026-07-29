@@ -1,7 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Card, Form, Input, Select, Button, message, Spin, Space, InputNumber, Switch, Breadcrumb } from 'antd';
-import { SaveOutlined, ApiOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { SaveOutlined, ApiOutlined, CheckCircleOutlined, CloseCircleOutlined, EditOutlined } from '@ant-design/icons';
 import { getAiConfig, updateAiConfig, testAiConnection } from '../../api/ai';
+
+const { TextArea } = Input;
+
+const DEFAULT_SYSTEM_PROMPT = `你是一个云资源巡检分析专家。根据巡检数据，生成简洁的分析报告。
+
+要求：
+1. 只分析异常和警告的资源，忽略正常的
+2. 直接指出问题和解决方案
+3. 使用简洁的语言
+
+报告格式：
+## 问题汇总
+列出所有异常和警告资源，一句话说明问题
+
+## 处理建议
+针对每个问题给出具体的操作建议
+
+## 风险提醒
+需要立即处理的高风险项`;
 
 const PROVIDERS = [
   { value: 'dashscope', label: '阿里云百炼 (通义千问)', defaultUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
@@ -140,6 +159,33 @@ export default function AiConfigPage() {
               label="最大输出 Token"
             >
               <InputNumber min={256} max={32768} style={{ width: '100%' }} />
+            </Form.Item>
+
+            <Form.Item
+              name="system_prompt"
+              label={
+                <span>
+                  <EditOutlined style={{ marginRight: 4 }} />
+                  巡检报告分析提示词
+                </span>
+              }
+              extra="自定义 AI 分析巡检报告时的系统提示词。留空使用默认提示词。"
+            >
+              <TextArea
+                rows={10}
+                placeholder={DEFAULT_SYSTEM_PROMPT}
+                style={{ fontFamily: 'monospace', fontSize: 13 }}
+              />
+            </Form.Item>
+
+            <Form.Item>
+              <Button
+                type="link"
+                size="small"
+                onClick={() => form.setFieldValue('system_prompt', DEFAULT_SYSTEM_PROMPT)}
+              >
+                恢复默认提示词
+              </Button>
             </Form.Item>
 
             <Form.Item

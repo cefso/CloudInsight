@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Card, Button, Spin, message, Collapse, Tag } from 'antd';
-import { RobotOutlined, ReloadOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Card, Button, Spin, message, Collapse, Tag, Tooltip } from 'antd';
+import { RobotOutlined, ReloadOutlined, ClockCircleOutlined, CopyOutlined, CheckOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeInspection, getAiReports } from '../../../api/ai';
@@ -21,13 +21,72 @@ export default function AiReport({ taskId }: Props) {
   const [reports, setReports] = useState<AiReportType[]>([]);
   const [currentReport, setCurrentReport] = useState<AiReportType | null>(null);
   const [visible, setVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
 
+  /** Markdown 转 HTML（简单转换） */
+  const markdownToHtml = (md: string): string => {
+    let html = md
+      // 标题
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      // 粗体
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // 斜体
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      // 行内代码
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      // 列表项
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      // 换行
+      .replace(/\n/g, '<br>');
+    // 包裹连续的 <li> 为 <ul>
+    html = html.replace(/(<li>.*?<\/li>)(<br>)?/g, '$1');
+    html = html.replace(/((?:<li>.*?<\/li><br>?)+)/g, '<ul>$1</ul>');
+    return html;
+  };
+
+  /** 复制为富文本 */
+  const handleCopyRichText = async () => {
+    const filteredContent = filterThinkTags(content);
+    if (!filteredContent) return;
+
+    try {
+      const html = markdownToHtml(filteredContent);
+      const blob = new Blob([html], { type: 'text/html' });
+      const textBlob = new Blob([filteredContent], { type: 'text/plain' });
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': blob,
+          'text/plain': textBlob,
+        }),
+      ]);
+
+      setCopied(true);
+      message.success('已复制为富文本，可粘贴到 Word、邮件等');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      message.error('复制失败，请重试');
+    }
+  };
+
   useEffect(() => {
-    loadReports();
+    // 监听触发分析的事件
+    const handleTrigger = () => {
+      setVisible(true);
+      // 延迟执行分析，确保状态已更新
+      setTimeout(() => {
+        handleAnalyze();
+      }, 100);
+    };
+    window.addEventListener('trigger-ai-analyze', handleTrigger);
+
     return () => {
       cleanupRef.current?.();
       cleanupRef.current = null;
+      window.removeEventListener('trigger-ai-analyze', handleTrigger);
     };
   }, [taskId]);
 
@@ -38,7 +97,6 @@ export default function AiReport({ taskId }: Props) {
       if (data.length > 0) {
         setCurrentReport(data[0]);
         setContent(data[0].content);
-        setVisible(true);
       }
     } catch {
       // 静默失败
@@ -50,7 +108,6 @@ export default function AiReport({ taskId }: Props) {
     cleanupRef.current = null;
     setLoading(true);
     setContent('');
-    setVisible(true);
 
     cleanupRef.current = analyzeInspection(
       taskId,
@@ -75,18 +132,7 @@ export default function AiReport({ taskId }: Props) {
   };
 
   if (!visible) {
-    return (
-      <div style={{ marginBottom: 16 }}>
-        <Button
-          type="primary"
-          icon={<RobotOutlined />}
-          loading={loading}
-          onClick={handleAnalyze}
-        >
-          AI 分析
-        </Button>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -103,14 +149,27 @@ export default function AiReport({ taskId }: Props) {
         </div>
       }
       extra={
-        <Button
-          type="primary"
-          icon={<ReloadOutlined />}
-          loading={loading}
-          onClick={handleAnalyze}
-        >
-          {content ? '重新分析' : '生成分析'}
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {content && (
+            <Tooltip title="复制为富文本，可粘贴到 Word、邮件等">
+              <Button
+                icon={copied ? <CheckOutlined /> : <CopyOutlined />}
+                onClick={handleCopyRichText}
+                type={copied ? 'primary' : 'default'}
+              >
+                {copied ? '已复制' : '复制'}
+              </Button>
+            </Tooltip>
+          )}
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={handleAnalyze}
+          >
+            {content ? '重新分析' : '生成分析'}
+          </Button>
+        </div>
       }
       style={{ marginBottom: 16 }}
     >
