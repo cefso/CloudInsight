@@ -9,6 +9,9 @@ from services.clients.rds_client import RdsClientWrapper
 
 logger = logging.getLogger(__name__)
 
+# 全局缓存实例名称，避免跨区域重复查询
+_instance_name_cache: dict[str, str] = {}
+
 
 class CmsClientWrapper:
     RESOURCE_METRICS = {
@@ -201,7 +204,19 @@ class CmsClientWrapper:
 
             if resources:
                 if namespace == "acs_ecs_dashboard":
-                    self._ecs_helper.fill_names(resources)
+                    # 先从缓存中填充名称
+                    for r in resources:
+                        if r["instanceId"] in _instance_name_cache:
+                            r["instanceName"] = _instance_name_cache[r["instanceId"]]
+
+                    # 找出还没有名称的资源
+                    unfilled = [r for r in resources if r["instanceName"] == r["instanceId"]]
+                    if unfilled:
+                        self._ecs_helper.fill_names(unfilled)
+                        # 将获取到的名称存入缓存
+                        for r in unfilled:
+                            if r["instanceName"] != r["instanceId"]:
+                                _instance_name_cache[r["instanceId"]] = r["instanceName"]
                 elif namespace == "acs_rds_dashboard":
                     self._rds_helper.fill_names(resources)
 
