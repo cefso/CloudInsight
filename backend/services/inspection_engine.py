@@ -34,9 +34,9 @@ REDIS_SUPPORTED_REGIONS = {
 }
 
 SLB_SUPPORTED_REGIONS = {
-    "cn-beijing", "cn-chengdu", "cn-fuzhou", "cn-guangzhou", "cn-heyuan",
-    "cn-hongkong", "cn-huhehaote", "cn-nanjing", "cn-qingdao", "cn-shanghai",
-    "cn-shenzhen", "cn-wuhan-lr", "cn-wulanchabu", "cn-zhangjiakou",
+    "cn-beijing", "cn-chengdu", "cn-fuzhou", "cn-guangzhou", "cn-hangzhou",
+    "cn-heyuan", "cn-hongkong", "cn-huhehaote", "cn-nanjing", "cn-qingdao",
+    "cn-shanghai", "cn-shenzhen", "cn-wuhan-lr", "cn-wulanchabu", "cn-zhangjiakou",
     "cn-zhengzhou-jva", "cn-zhongwei"
 }
 

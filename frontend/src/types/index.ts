@@ -140,6 +140,7 @@ export interface AiConfig {
   api_key: string | null;
   model: string;
   max_tokens: number;
+  system_prompt: string | null;
   enabled: boolean;
 }
 

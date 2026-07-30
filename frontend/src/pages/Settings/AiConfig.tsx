@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, Form, Input, Select, Button, message, Spin, Space, InputNumber, Switch, Breadcrumb } from 'antd';
-import { SaveOutlined, ApiOutlined, CheckCircleOutlined, CloseCircleOutlined, EditOutlined } from '@ant-design/icons';
+import { SaveOutlined, ApiOutlined, CheckCircleOutlined, CloseCircleOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
+import ReactMarkdown from 'react-markdown';
 import { getAiConfig, updateAiConfig, testAiConnection } from '../../api/ai';
 
 const { TextArea } = Input;
 
+// 默认提示词
 const DEFAULT_SYSTEM_PROMPT = `你是一个云资源巡检分析专家。根据巡检数据，生成简洁的分析报告。
 
 要求：
@@ -35,17 +37,37 @@ export default function AiConfigPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [previewPrompt, setPreviewPrompt] = useState('');
+
+  // 监听 system_prompt 字段变化
+  const systemPromptValue = Form.useWatch('system_prompt', form);
 
   useEffect(() => {
     loadConfig();
   }, []);
+
+  // 同步表单值到预览状态
+  useEffect(() => {
+    if (systemPromptValue !== undefined) {
+      setPreviewPrompt(systemPromptValue || '');
+    }
+  }, [systemPromptValue]);
 
   const loadConfig = async () => {
     setLoading(true);
     try {
       const config = await getAiConfig();
       if (config) {
-        form.setFieldsValue(config);
+        form.setFieldsValue({
+          provider: config.provider,
+          base_url: config.base_url,
+          model: config.model,
+          max_tokens: config.max_tokens,
+          enabled: config.enabled,
+          system_prompt: config.system_prompt || '',
+        });
+        // 同步设置预览内容
+        setPreviewPrompt(config.system_prompt || '');
       }
     } catch {
       message.error('加载配置失败');
@@ -169,20 +191,38 @@ export default function AiConfigPage() {
                   巡检报告分析提示词
                 </span>
               }
-              extra="自定义 AI 分析巡检报告时的系统提示词。留空使用默认提示词。"
+              extra="自定义 AI 分析巡检报告时的系统提示词。留空使用默认提示词。支持 Markdown 格式。"
             >
               <TextArea
-                rows={10}
+                rows={12}
                 placeholder={DEFAULT_SYSTEM_PROMPT}
                 style={{ fontFamily: 'monospace', fontSize: 13 }}
+                onChange={(e) => setPreviewPrompt(e.target.value)}
               />
             </Form.Item>
+
+            {previewPrompt && (
+              <Form.Item label={<span><EyeOutlined /> 预览效果</span>}>
+                <div style={{
+                  minHeight: 100,
+                  padding: 16,
+                  border: '1px solid var(--ant-color-border)',
+                  borderRadius: 8,
+                  background: 'var(--ant-color-bg-container)',
+                }}>
+                  <ReactMarkdown>{previewPrompt}</ReactMarkdown>
+                </div>
+              </Form.Item>
+            )}
 
             <Form.Item>
               <Button
                 type="link"
                 size="small"
-                onClick={() => form.setFieldValue('system_prompt', DEFAULT_SYSTEM_PROMPT)}
+                onClick={() => {
+                  form.setFieldValue('system_prompt', DEFAULT_SYSTEM_PROMPT);
+                  setPreviewPrompt(DEFAULT_SYSTEM_PROMPT);
+                }}
               >
                 恢复默认提示词
               </Button>
