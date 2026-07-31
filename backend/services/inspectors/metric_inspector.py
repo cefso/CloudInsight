@@ -37,7 +37,23 @@ def inspect_metrics(
         return {"total": 0, "normal": 0, "warning": 0, "abnormal": 0}
 
     resources = client.list_resources(namespace, metric_names[0])
+
+    # 获取已存在的资源ID，避免重复存储
+    existing_ids = set()
+    existing_results = db.query(InspectionResult.resource_id).filter(
+        InspectionResult.task_id == task_id,
+        InspectionResult.account_id == account.id,
+        InspectionResult.resource_type == RESOURCE_TYPE_NAMES.get(namespace, namespace)
+    ).all()
+    for r in existing_results:
+        existing_ids.add(r.resource_id)
+
     for resource in resources:
+        resource_id = resource.get("instanceId", "")
+        # 跳过已存在的资源
+        if resource_id in existing_ids:
+            continue
+        existing_ids.add(resource_id)
         total += 1
         cpu_usage, memory_usage, disk_usage = None, None, None
         disk_details = []
