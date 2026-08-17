@@ -12,9 +12,13 @@ router = APIRouter(prefix="/api/dashboard", tags=["仪表盘"])
 
 
 @router.get("/stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(task_id: Optional[int] = None, db: Session = Depends(get_db)):
     account_count = db.query(CloudAccount).filter(CloudAccount.is_enabled.is_(True)).count()
-    last_task = db.query(InspectionTask).filter(InspectionTask.status == "completed").order_by(desc(InspectionTask.completed_at)).first()
+
+    if task_id:
+        last_task = db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
+    else:
+        last_task = db.query(InspectionTask).filter(InspectionTask.status == "completed").order_by(desc(InspectionTask.completed_at)).first()
 
     total_resources, normal_count, warning_count, abnormal_count = 0, 0, 0, 0
     last_inspection_time = None
@@ -40,13 +44,22 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/abnormal-resources")
-def get_abnormal_resources(limit: int = Query(10, ge=1, le=100), account_id: Optional[int] = None, db: Session = Depends(get_db)):
-    last_task = db.query(InspectionTask).filter(InspectionTask.status == "completed").order_by(desc(InspectionTask.completed_at)).first()
-    if not last_task:
+def get_abnormal_resources(
+    limit: int = Query(10, ge=1, le=100),
+    account_id: Optional[int] = None,
+    task_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    if task_id:
+        target_task = db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
+    else:
+        target_task = db.query(InspectionTask).filter(InspectionTask.status == "completed").order_by(desc(InspectionTask.completed_at)).first()
+
+    if not target_task:
         return success_response(data=[])
 
     query = db.query(InspectionResult).filter(
-        InspectionResult.task_id == last_task.id, InspectionResult.status.in_(["abnormal", "warning"])
+        InspectionResult.task_id == target_task.id, InspectionResult.status.in_(["abnormal", "warning"])
     )
     if account_id is not None:
         query = query.filter(InspectionResult.account_id == account_id)

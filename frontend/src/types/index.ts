@@ -22,6 +22,7 @@ export interface InspectionTask {
   warning_count: number;
   abnormal_count: number;
   error_message: string | null;
+  account_names?: string[];
 }
 
 // 巡检结果

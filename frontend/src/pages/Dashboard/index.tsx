@@ -3,10 +3,10 @@ import { Card, Row, Col, Statistic, Button, Table, Tag, message, Space, Breadcru
 import { CloudServerOutlined, CheckCircleOutlined, WarningOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getDashboardStats, getAbnormalResources } from '../../api/dashboard';
-import { triggerInspection } from '../../api/inspections';
+import { triggerInspection, getInspectionTasks } from '../../api/inspections';
 import { getAccounts } from '../../api/accounts';
 import type { AbnormalResource } from '../../api/dashboard';
-import type { DashboardStats, CloudAccount } from '../../types';
+import type { DashboardStats, CloudAccount, InspectionTask } from '../../types';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -17,18 +17,20 @@ export default function Dashboard() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [filterAccountId, setFilterAccountId] = useState<number | undefined>(undefined);
+  const [tasks, setTasks] = useState<InspectionTask[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | undefined>(undefined);
 
-  const fetchStats = async () => {
+  const fetchStats = async (taskId?: number) => {
     try {
-      const statsData = await getDashboardStats();
+      const statsData = await getDashboardStats(taskId);
       setStats(statsData);
     } catch { message.error('获取统计数据失败'); }
   };
 
-  const fetchAbnormalResources = async (accountId?: number) => {
+  const fetchAbnormalResources = async (accountId?: number, taskId?: number) => {
     setLoading(true);
     try {
-      const data = await getAbnormalResources(10, accountId);
+      const data = await getAbnormalResources(10, accountId, taskId);
       setAbnormalResources(data);
     } catch { message.error('获取异常资源失败'); }
     finally { setLoading(false); }
@@ -38,15 +40,33 @@ export default function Dashboard() {
     try { setAccounts(await getAccounts()); } catch { /* ignore */ }
   };
 
+  const fetchTasks = async () => {
+    try {
+      const result = await getInspectionTasks(1, 50);
+      setTasks(result.items || []);
+      // 默认选中最新的完成任务
+      const latestCompleted = result.items?.find((t: InspectionTask) => t.status === 'completed');
+      if (latestCompleted) {
+        setSelectedTaskId(latestCompleted.id);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const getTaskLabel = (task: InspectionTask) => {
+    const accountNames = task.account_names?.join(', ') || '未知账号';
+    const time = dayjs(task.started_at).format('MM-DD HH:mm');
+    return `#${task.id} ${accountNames} ${time}`;
+  };
+
   useEffect(() => {
-    fetchStats();
+    fetchTasks();
     fetchAccounts();
-    fetchAbnormalResources();
   }, []);
 
   useEffect(() => {
-    fetchAbnormalResources(filterAccountId);
-  }, [filterAccountId]);
+    fetchStats(selectedTaskId);
+    fetchAbnormalResources(filterAccountId, selectedTaskId);
+  }, [selectedTaskId, filterAccountId]);
 
   const getAccountName = (id: number) => accounts.find(a => a.id === id)?.name || `账号${id}`;
 
@@ -63,8 +83,15 @@ export default function Dashboard() {
     try {
       await triggerInspection(selectedAccountIds);
       message.success('巡检任务已提交，请稍后刷新查看结果');
+      // 刷新任务列表
+      setTimeout(() => fetchTasks(), 2000);
     } catch { message.error('触发巡检失败'); }
     finally { setTriggering(false); }
+  };
+
+  const handleRefresh = () => {
+    fetchStats(selectedTaskId);
+    fetchAbnormalResources(filterAccountId, selectedTaskId);
   };
 
   const columns = [
@@ -87,6 +114,18 @@ export default function Dashboard() {
           {stats?.last_inspection_time && <p style={{ color: 'var(--ant-color-text-secondary)', margin: '4px 0 0 0' }}>最近更新: {dayjs(stats.last_inspection_time).format('YYYY-MM-DD HH:mm:ss')}</p>}
         </div>
         <Space>
+          <Select
+            style={{ width: 350 }}
+            placeholder="选择巡检任务"
+            value={selectedTaskId}
+            onChange={setSelectedTaskId}
+            allowClear
+            options={tasks.map(t => ({
+              label: getTaskLabel(t),
+              value: t.id,
+            }))}
+          />
+          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>刷新</Button>
           <Button type="primary" icon={<ReloadOutlined />} loading={triggering} onClick={handleTriggerClick}>立即巡检</Button>
         </Space>
       </div>
