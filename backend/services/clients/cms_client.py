@@ -82,8 +82,8 @@ class CmsClientWrapper:
                                     for dn in disknames:
                                         if any(dn.startswith(prefix) for prefix in filter_prefixes):
                                             continue
-                                        # 支持 Linux 挂载点 (/) 和 Windows 盘符 (C:, D:)
-                                        if dn and (dn.startswith("/") or (len(dn) == 2 and dn[1] == ":")):
+                                        # 支持 Linux 挂载点 (/) 和 Windows 盘符 (C:\, D:\)
+                                        if dn and (dn.startswith("/") or (len(dn) >= 2 and dn[1] == ":")):
                                             device_values[dn] = float(val)
                                 elif val is not None:
                                     return {"value": float(val), "disks": []}
