@@ -143,7 +143,8 @@ export default function InspectionDetail() {
     for (const disk of diskDetails) {
       const names = disk.device?.split(',').map((s: string) => s.trim()) || [];
       for (const name of names) {
-        if (name && name.startsWith('/')) expandedDisks.push({ device: name, usage: disk.usage });
+        // 支持 Linux 挂载点 (/) 和 Windows 盘符 (C:\, D:\)
+        if (name && (name.startsWith('/') || (name.length >= 2 && name[1] === ':'))) expandedDisks.push({ device: name, usage: disk.usage });
       }
     }
     const filtered = expandedDisks.filter(d => !filterPrefixes.some(p => d.device?.startsWith(p)));
