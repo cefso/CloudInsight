@@ -14,6 +14,7 @@ export async function createCustomer(params: {
   contact?: string;
   phone?: string;
   remark?: string;
+  account_ids?: number[];
 }): Promise<{ id: number }> {
   return await api.post('/customers', params);
 }
@@ -23,6 +24,7 @@ export async function updateCustomer(id: number, params: Partial<{
   contact: string;
   phone: string;
   remark: string;
+  account_ids: number[];
 }>): Promise<void> {
   await api.put(`/customers/${id}`, params);
 }

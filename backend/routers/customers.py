@@ -48,6 +48,25 @@ def list_customers(db: Session = Depends(get_db)):
     return success_response(data=items)
 
 
+def _assign_accounts(db: Session, customer_id: int, account_ids: list[int] | None):
+    """在客户侧维护归属：勾选的账号归入本客户，原先属于本客户但未勾选的解除归属"""
+    if account_ids is None:
+        return
+    valid = {row[0] for row in db.query(CloudAccount.id).filter(CloudAccount.id.in_(account_ids)).all()} if account_ids else set()
+    missing = set(account_ids) - valid
+    if missing:
+        raise HTTPException(status_code=400, detail=f"账号不存在: {missing}")
+    # 未勾选的旧归属解除
+    unassign_q = db.query(CloudAccount).filter(CloudAccount.customer_id == customer_id)
+    if account_ids:
+        unassign_q = unassign_q.filter(CloudAccount.id.notin_(account_ids))
+    unassign_q.update({CloudAccount.customer_id: None}, synchronize_session=False)
+    if account_ids:
+        db.query(CloudAccount).filter(CloudAccount.id.in_(account_ids)).update(
+            {CloudAccount.customer_id: customer_id}, synchronize_session=False
+        )
+
+
 @router.post("")
 def create_customer(request: CustomerCreate, db: Session = Depends(get_db)):
     existing = db.query(Customer).filter(Customer.name == request.name).first()
@@ -62,6 +81,8 @@ def create_customer(request: CustomerCreate, db: Session = Depends(get_db)):
     db.add(customer)
     db.commit()
     db.refresh(customer)
+    _assign_accounts(db, customer.id, request.account_ids)
+    db.commit()
     return success_response(data={"id": customer.id}, message="客户创建成功")
 
 
@@ -90,6 +111,8 @@ def update_customer(customer_id: int, request: CustomerUpdate, db: Session = Dep
         customer.phone = request.phone
     if request.remark is not None:
         customer.remark = request.remark
+    db.commit()
+    _assign_accounts(db, customer.id, request.account_ids)
     db.commit()
     return success_response(message="客户更新成功")
 

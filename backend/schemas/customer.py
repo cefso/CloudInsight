@@ -8,6 +8,7 @@ class CustomerCreate(BaseModel):
     contact: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=50)
     remark: Optional[str] = None
+    account_ids: Optional[list[int]] = None
 
 
 class CustomerUpdate(BaseModel):
@@ -15,3 +16,4 @@ class CustomerUpdate(BaseModel):
     contact: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=50)
     remark: Optional[str] = None
+    account_ids: Optional[list[int]] = None
