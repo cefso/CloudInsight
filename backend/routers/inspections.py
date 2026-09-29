@@ -43,7 +43,7 @@ def _run_inspection_background(account_ids, trigger_type, task_id):
 
 def _resolve_account_ids(db: Session, account_ids, customer_ids) -> Optional[list[int]]:
     """按请求解析实际巡检账号 ID 列表；None 表示全部启用账号"""
-    if account_ids:
+    if account_ids is not None:
         return account_ids
     if customer_ids:
         rows = (
@@ -60,6 +60,11 @@ def _resolve_account_ids(db: Session, account_ids, customer_ids) -> Optional[lis
 
 @router.post("/trigger")
 def trigger_inspection(request: TriggerInspectionRequest, db: Session = Depends(get_db)):
+    if request.customer_ids:
+        existing = {row[0] for row in db.query(Customer.id).filter(Customer.id.in_(request.customer_ids)).all()}
+        missing = set(request.customer_ids) - existing
+        if missing:
+            raise HTTPException(status_code=400, detail=f"客户不存在: {missing}")
     account_ids = _resolve_account_ids(db, request.account_ids, request.customer_ids)
     if account_ids is not None and len(account_ids) == 0:
         raise HTTPException(status_code=400, detail="无可用云账号，请先选择账号或客户")
@@ -133,11 +138,7 @@ def list_tasks(
         ).distinct().subquery()
         query = query.filter(InspectionTask.id.in_(task_ids))
     if customer_id:
-        # 优先匹配任务上的客户快照；无快照的旧任务回退为账号归属
-        customer_account_ids = [
-            row[0] for row in
-            db.query(CloudAccount.id).filter(CloudAccount.customer_id == customer_id).all()
-        ]
+        # 有客户快照的以快照为准（不随后续账号改挂漂移）；无快照旧任务回退为账号归属
         snapshot_task_ids = []
         for row in db.query(InspectionTask.id, InspectionTask.customer_ids).filter(
             InspectionTask.customer_ids.isnot(None)
@@ -149,11 +150,18 @@ def list_tasks(
             if customer_id in ids:
                 snapshot_task_ids.append(row.id)
         fallback_task_ids = []
+        customer_account_ids = [
+            row[0] for row in
+            db.query(CloudAccount.id).filter(CloudAccount.customer_id == customer_id).all()
+        ]
         if customer_account_ids:
             fallback_task_ids = [
                 row[0] for row in
                 db.query(InspectionResult.task_id).filter(
-                    InspectionResult.account_id.in_(customer_account_ids)
+                    InspectionResult.account_id.in_(customer_account_ids),
+                    InspectionResult.task_id.in_(
+                        db.query(InspectionTask.id).filter(InspectionTask.customer_ids.is_(None))
+                    ),
                 ).distinct().all()
             ]
         matched_ids = set(snapshot_task_ids) | set(fallback_task_ids)

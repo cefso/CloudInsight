@@ -91,6 +91,9 @@ class TaskScheduler:
                 db.commit()
                 account_ids = self._resolve_account_ids(db, config)
                 customer_ids = json.loads(config.customer_ids) if config.customer_ids else None
+                if account_ids is not None and len(account_ids) == 0:
+                    logger.info("定时任务 %s 目标账号为空，跳过本次巡检", config_id)
+                    return
             else:
                 account_ids = None
                 customer_ids = None

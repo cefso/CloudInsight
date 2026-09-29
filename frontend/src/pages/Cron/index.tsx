@@ -63,6 +63,10 @@ export default function Cron() {
   const columns = [
     { title: '任务名称', dataIndex: 'name', key: 'name' },
     { title: 'Cron 表达式', dataIndex: 'cron_expression', key: 'cron', render: (e: string) => <code>{e}</code> },
+    { title: '适用客户', dataIndex: 'customer_names', key: 'customers', render: (names: string[]) => {
+      if (!names || names.length === 0) return <span style={{ color: 'var(--color-muted)' }}>-</span>;
+      return <Space size={4} wrap>{names.map((n, i) => <Tag color="geekblue" key={i}>{n}</Tag>)}</Space>;
+    }},
     { title: '适用账号', dataIndex: 'account_names', key: 'accounts', render: (names: string[]) => {
       if (!names || names.length === 0) return <Tag>全部账号</Tag>;
       return <Space size={4} wrap>{names.map((n, i) => <Tag key={i}>{n}</Tag>)}</Space>;

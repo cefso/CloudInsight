@@ -70,10 +70,11 @@ class InspectionEngine:
             self.db.refresh(task)
 
         try:
-            if account_ids:
+            # account_ids is None 表示全部启用账号；[] 表示目标为空，不得回退成全量
+            if account_ids is not None:
                 accounts = self.db.query(CloudAccount).filter(
                     CloudAccount.id.in_(account_ids), CloudAccount.is_enabled.is_(True)
-                ).all()
+                ).all() if account_ids else []
             else:
                 accounts = self.db.query(CloudAccount).filter(CloudAccount.is_enabled.is_(True)).all()
 
