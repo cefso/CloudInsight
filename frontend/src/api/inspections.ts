@@ -9,7 +9,7 @@ import type {
 
 // ========== 巡检任务 ==========
 
-export async function getInspectionTasks(page = 1, pageSize = 20, filters?: { trigger_type?: string; account_id?: number }): Promise<PaginatedResponse<InspectionTask>> {
+export async function getInspectionTasks(page = 1, pageSize = 20, filters?: { trigger_type?: string; account_id?: number; customer_id?: number }): Promise<PaginatedResponse<InspectionTask>> {
   return await api.get('/inspections/tasks', { params: { page, page_size: pageSize, ...filters } });
 }
 
@@ -20,6 +20,7 @@ export async function getInspectionTask(taskId: number): Promise<InspectionTask>
 export async function getInspectionResults(params: {
   task_id?: number;
   account_id?: number;
+  customer_id?: number;
   resource_type?: string;
   status?: string;
   page?: number;
@@ -36,8 +37,11 @@ export async function exportResults(taskId?: number, format = 'excel'): Promise<
   return response as unknown as Blob;
 }
 
-export async function triggerInspection(accountIds?: number[]): Promise<{ task_id: number }> {
-  return await api.post('/inspections/trigger', { account_ids: accountIds });
+export async function triggerInspection(params: {
+  account_ids?: number[];
+  customer_ids?: number[];
+}): Promise<{ task_id: number }> {
+  return await api.post('/inspections/trigger', params);
 }
 
 // ========== 告警阈值 ==========
@@ -63,6 +67,8 @@ export async function getCronConfigs(): Promise<CronConfig[]> {
 export async function createCronConfig(params: {
   name: string;
   cron_expression: string;
+  account_ids?: number[];
+  customer_ids?: number[];
 }): Promise<{ id: number }> {
   return await api.post('/cron', params);
 }
@@ -70,6 +76,8 @@ export async function createCronConfig(params: {
 export async function updateCronConfig(id: number, params: {
   name?: string;
   cron_expression?: string;
+  account_ids?: number[];
+  customer_ids?: number[];
   is_enabled?: boolean;
 }): Promise<void> {
   await api.put(`/cron/${id}`, params);

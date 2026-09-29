@@ -58,6 +58,30 @@ class TaskScheduler:
         if config.is_enabled:
             self.add_job(config)
 
+    def _resolve_account_ids(self, db, config) -> list[int] | None:
+        """动态展开定时任务目标账号：客户当前启用账号 ∪ 指定账号；皆空则全部启用账号"""
+        from models import CloudAccount
+
+        customer_ids = json.loads(config.customer_ids) if config.customer_ids else None
+        account_ids = json.loads(config.account_ids) if config.account_ids else None
+        if not customer_ids and not account_ids:
+            return None
+
+        resolved: set[int] = set()
+        if customer_ids:
+            rows = db.query(CloudAccount.id).filter(
+                CloudAccount.customer_id.in_(customer_ids),
+                CloudAccount.is_enabled.is_(True),
+            ).all()
+            resolved.update(row[0] for row in rows)
+        if account_ids:
+            rows = db.query(CloudAccount.id).filter(
+                CloudAccount.id.in_(account_ids),
+                CloudAccount.is_enabled.is_(True),
+            ).all()
+            resolved.update(row[0] for row in rows)
+        return sorted(resolved)
+
     def _run_inspection(self, config_id: int):
         db = SessionLocal()
         try:
@@ -65,11 +89,18 @@ class TaskScheduler:
             if config:
                 config.last_run_at = datetime.now(timezone.utc)
                 db.commit()
-                account_ids = json.loads(config.account_ids) if config.account_ids else None
+                account_ids = self._resolve_account_ids(db, config)
+                customer_ids = json.loads(config.customer_ids) if config.customer_ids else None
             else:
                 account_ids = None
+                customer_ids = None
             engine = InspectionEngine(db)
-            engine.run_inspection(trigger_type="cron", account_ids=account_ids)
+            # customer_ids 仅用于任务快照；实际巡检账号已展开
+            engine.run_inspection(
+                trigger_type="cron",
+                account_ids=account_ids,
+                customer_ids=customer_ids,
+            )
         except Exception as e:
             logger.error(f"定时巡检失败: {e}")
         finally:

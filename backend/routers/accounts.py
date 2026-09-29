@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-from models import CloudAccount
+from models import CloudAccount, Customer
 from schemas.cloud_account import (
     CloudAccountCreate, CloudAccountUpdate, TestConnectionRequest
 )
@@ -15,16 +15,27 @@ router = APIRouter(prefix="/api/accounts", tags=["账号管理"])
 
 def _serialize_account(account: CloudAccount) -> dict:
     """序列化账号信息，脱敏 AK"""
+    customer = account.customer
     return {
         "id": account.id,
         "name": account.name,
         "access_key_id": crypto_service.mask_ak(account.access_key_id),
         "regions": json.loads(account.regions) if account.regions else None,
         "resource_types": json.loads(account.resource_types) if account.resource_types else None,
+        "customer_id": account.customer_id,
+        "customer_name": customer.name if customer else None,
         "is_enabled": account.is_enabled,
         "created_at": account.created_at,
         "updated_at": account.updated_at,
     }
+
+
+def _validate_customer(db: Session, customer_id):
+    if customer_id is None:
+        return
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=400, detail="客户不存在")
 
 
 @router.get("")
@@ -35,6 +46,7 @@ def list_accounts(db: Session = Depends(get_db)):
 
 @router.post("")
 def create_account(request: CloudAccountCreate, db: Session = Depends(get_db)):
+    _validate_customer(db, request.customer_id)
     encrypted_secret = crypto_service.encrypt(request.access_key_secret)
     account = CloudAccount(
         name=request.name,
@@ -42,6 +54,7 @@ def create_account(request: CloudAccountCreate, db: Session = Depends(get_db)):
         access_key_secret=encrypted_secret,
         regions=json.dumps(request.regions) if request.regions else None,
         resource_types=json.dumps(request.resource_types) if request.resource_types else None,
+        customer_id=request.customer_id,
     )
     db.add(account)
     db.commit()
@@ -73,6 +86,12 @@ def update_account(account_id: int, request: CloudAccountUpdate, db: Session = D
         account.regions = json.dumps(request.regions)
     if request.resource_types is not None:
         account.resource_types = json.dumps(request.resource_types)
+    if request.customer_id is not None:
+        _validate_customer(db, request.customer_id)
+        account.customer_id = request.customer_id
+    elif request.customer_id is None and "customer_id" in request.model_fields_set:
+        # 显式传 null 时解除归属
+        account.customer_id = None
     if request.is_enabled is not None:
         account.is_enabled = request.is_enabled
     db.commit()

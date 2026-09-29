@@ -5,6 +5,7 @@ import { darkTheme, lightTheme } from './styles/theme';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
+import Customers from './pages/Customers';
 import Inspections from './pages/Inspections';
 import InspectionDetail from './pages/Inspections/Detail';
 import Thresholds from './pages/Thresholds';
@@ -19,6 +20,7 @@ function AppInner() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
+            <Route path="customers" element={<Customers />} />
             <Route path="accounts" element={<Accounts />} />
             <Route path="inspections" element={<Inspections />} />
             <Route path="inspections/:taskId" element={<InspectionDetail />} />

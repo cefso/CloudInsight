@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Modal, Form, Input, Select, message } from 'antd';
 import { createAccount, updateAccount } from '../../api/accounts';
-import type { CloudAccount } from '../../types';
+import { getCustomers } from '../../api/customers';
+import type { CloudAccount, Customer } from '../../types';
 
 const REGION_OPTIONS = [
   // 中国地区
@@ -41,7 +42,15 @@ interface AccountFormProps {
 export default function AccountForm({ visible, onClose, onSuccess, initialValues }: AccountFormProps) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const isEdit = !!initialValues?.id;
+
+  useEffect(() => {
+    if (!visible) return;
+    getCustomers()
+      .then(setCustomers)
+      .catch(() => setCustomers([]));
+  }, [visible]);
 
   // 当 initialValues 变化时，设置表单值
   useEffect(() => {
@@ -57,7 +66,11 @@ export default function AccountForm({ visible, onClose, onSuccess, initialValues
       const values = await form.validateFields();
       setLoading(true);
       if (isEdit) {
-        await updateAccount(initialValues.id, values);
+        // 清空客户下拉时显式传 null，保证后端解除归属
+        await updateAccount(initialValues.id, {
+          ...values,
+          customer_id: values.customer_id ?? null,
+        });
         message.success('更新成功');
       } else {
         await createAccount(values);
@@ -99,6 +112,13 @@ export default function AccountForm({ visible, onClose, onSuccess, initialValues
         </Form.Item>
         <Form.Item name="resource_types" label="资源类型">
           <Select mode="multiple" options={RESOURCE_TYPE_OPTIONS} />
+        </Form.Item>
+        <Form.Item name="customer_id" label="归属客户" tooltip="可选。多个云账号可归属同一客户，便于按客户批量巡检">
+          <Select
+            allowClear
+            placeholder="不归属任何客户"
+            options={customers.map((c) => ({ label: c.name, value: c.id }))}
+          />
         </Form.Item>
       </Form>
     </Modal>

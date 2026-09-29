@@ -14,6 +14,7 @@ const menuItems = [
     icon: <SettingOutlined />,
     label: '配置中心',
     children: [
+      { key: '/customers', label: '客户管理' },
       { key: '/thresholds', label: '告警阈值' },
       { key: '/cron', label: '定时任务' },
       { key: '/settings/ai', label: 'AI 设置' },

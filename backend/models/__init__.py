@@ -1,3 +1,4 @@
+from models.customer import Customer
 from models.cloud_account import CloudAccount
 from models.alert_threshold import AlertThreshold
 from models.inspection_task import InspectionTask
@@ -8,6 +9,7 @@ from models.ai_report import AiReport
 from models.ai_conversation import AiConversation
 
 __all__ = [
+    "Customer",
     "CloudAccount",
     "AlertThreshold",
     "InspectionTask",

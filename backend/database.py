@@ -47,11 +47,25 @@ def _migrate_columns():
         if "resource_type" not in th_columns:
             cursor.execute("ALTER TABLE alert_thresholds ADD COLUMN resource_type VARCHAR(50)")
         
-        # 为 cron_configs 添加 account_ids 列
+        # 为 cron_configs 添加 account_ids / customer_ids 列
         cursor.execute("PRAGMA table_info(cron_configs)")
         cron_columns = {row[1] for row in cursor.fetchall()}
         if "account_ids" not in cron_columns:
             cursor.execute("ALTER TABLE cron_configs ADD COLUMN account_ids TEXT")
+        if "customer_ids" not in cron_columns:
+            cursor.execute("ALTER TABLE cron_configs ADD COLUMN customer_ids TEXT")
+
+        # 为 cloud_accounts 添加 customer_id 列
+        cursor.execute("PRAGMA table_info(cloud_accounts)")
+        account_columns = {row[1] for row in cursor.fetchall()}
+        if "customer_id" not in account_columns:
+            cursor.execute("ALTER TABLE cloud_accounts ADD COLUMN customer_id INTEGER")
+
+        # 为 inspection_tasks 添加 customer_ids 列
+        cursor.execute("PRAGMA table_info(inspection_tasks)")
+        task_columns = {row[1] for row in cursor.fetchall()}
+        if "customer_ids" not in task_columns:
+            cursor.execute("ALTER TABLE inspection_tasks ADD COLUMN customer_ids TEXT")
 
         # 为 ai_config 添加 system_prompt 列
         cursor.execute("PRAGMA table_info(ai_config)")

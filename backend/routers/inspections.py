@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Optional
 from database import get_db, SessionLocal
-from models import InspectionTask, InspectionResult, CloudAccount
+from models import InspectionTask, InspectionResult, CloudAccount, Customer
 from schemas.inspection import TriggerInspectionRequest
 from utils.response import success_response
 from services.inspection_engine import InspectionEngine
@@ -41,29 +41,62 @@ def _run_inspection_background(account_ids, trigger_type, task_id):
         db.close()
 
 
+def _resolve_account_ids(db: Session, account_ids, customer_ids) -> Optional[list[int]]:
+    """按请求解析实际巡检账号 ID 列表；None 表示全部启用账号"""
+    if account_ids:
+        return account_ids
+    if customer_ids:
+        rows = (
+            db.query(CloudAccount.id)
+            .filter(
+                CloudAccount.customer_id.in_(customer_ids),
+                CloudAccount.is_enabled.is_(True),
+            )
+            .all()
+        )
+        return [row[0] for row in rows]
+    return None
+
+
 @router.post("/trigger")
 def trigger_inspection(request: TriggerInspectionRequest, db: Session = Depends(get_db)):
-    # 先创建任务记录
+    account_ids = _resolve_account_ids(db, request.account_ids, request.customer_ids)
+    if account_ids is not None and len(account_ids) == 0:
+        raise HTTPException(status_code=400, detail="无可用云账号，请先选择账号或客户")
+
     task = InspectionTask(
         trigger_type="manual",
         status="running",
-        started_at=datetime.now(timezone.utc)
+        started_at=datetime.now(timezone.utc),
+        customer_ids=json.dumps(request.customer_ids) if request.customer_ids else None,
     )
     db.add(task)
     db.commit()
     db.refresh(task)
-    
-    # 在后台线程中执行巡检
+
     thread = threading.Thread(
         target=_run_inspection_background,
-        args=(request.account_ids, "manual", task.id),
+        args=(account_ids, "manual", task.id),
         daemon=True
     )
     thread.start()
-    
+
     return success_response(data={"task_id": task.id}, message="巡检任务已启动")
 
-def _serialize_task(task: InspectionTask, account_names: list[str] = None) -> dict:
+
+def _customer_names(db: Session, customer_ids: Optional[list[int]]) -> list[str]:
+    if not customer_ids:
+        return []
+    rows = db.query(Customer.name).filter(Customer.id.in_(customer_ids)).all()
+    return [name for (name,) in rows]
+
+
+def _serialize_task(
+    task: InspectionTask,
+    account_names: list[str] = None,
+    customer_ids: list[int] = None,
+    customer_names: list[str] = None,
+) -> dict:
     """序列化巡检任务"""
     return {
         "id": task.id,
@@ -77,6 +110,8 @@ def _serialize_task(task: InspectionTask, account_names: list[str] = None) -> di
         "abnormal_count": task.abnormal_count,
         "error_message": task.error_message,
         "account_names": account_names or [],
+        "customer_ids": customer_ids or [],
+        "customer_names": customer_names or [],
     }
 
 
@@ -86,6 +121,7 @@ def list_tasks(
     page_size: int = Query(20, ge=1, le=50),
     trigger_type: Optional[str] = None,
     account_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     query = db.query(InspectionTask)
@@ -96,6 +132,32 @@ def list_tasks(
             InspectionResult.account_id == account_id
         ).distinct().subquery()
         query = query.filter(InspectionTask.id.in_(task_ids))
+    if customer_id:
+        # 优先匹配任务上的客户快照；无快照的旧任务回退为账号归属
+        customer_account_ids = [
+            row[0] for row in
+            db.query(CloudAccount.id).filter(CloudAccount.customer_id == customer_id).all()
+        ]
+        snapshot_task_ids = []
+        for row in db.query(InspectionTask.id, InspectionTask.customer_ids).filter(
+            InspectionTask.customer_ids.isnot(None)
+        ).all():
+            try:
+                ids = json.loads(row.customer_ids) if row.customer_ids else []
+            except (TypeError, json.JSONDecodeError):
+                ids = []
+            if customer_id in ids:
+                snapshot_task_ids.append(row.id)
+        fallback_task_ids = []
+        if customer_account_ids:
+            fallback_task_ids = [
+                row[0] for row in
+                db.query(InspectionResult.task_id).filter(
+                    InspectionResult.account_id.in_(customer_account_ids)
+                ).distinct().all()
+            ]
+        matched_ids = set(snapshot_task_ids) | set(fallback_task_ids)
+        query = query.filter(InspectionTask.id.in_(matched_ids) if matched_ids else False)
     total = query.count()
     tasks = query.order_by(desc(InspectionTask.started_at)).offset((page - 1) * page_size).limit(page_size).all()
     pages = (total + page_size - 1) // page_size
@@ -104,7 +166,6 @@ def list_tasks(
     task_ids = [t.id for t in tasks]
     task_account_map: dict[int, list[str]] = {}
     if task_ids:
-        from sqlalchemy import func
         account_rows = (
             db.query(InspectionResult.task_id, CloudAccount.name)
             .join(CloudAccount, InspectionResult.account_id == CloudAccount.id)
@@ -117,19 +178,28 @@ def list_tasks(
 
     items = []
     for task in tasks:
-        items.append(_serialize_task(task, task_account_map.get(task.id, [])))
+        try:
+            cids = json.loads(task.customer_ids) if task.customer_ids else []
+        except (TypeError, json.JSONDecodeError):
+            cids = []
+        items.append(_serialize_task(
+            task,
+            task_account_map.get(task.id, []),
+            cids,
+            _customer_names(db, cids),
+        ))
 
     return success_response(data={
         "items": items,
         "total": total, "page": page, "page_size": page_size, "pages": pages
     })
 
+
 @router.get("/tasks/{task_id}")
 def get_task(task_id: int, db: Session = Depends(get_db)):
     task = db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
-    account_names = []
     account_rows = (
         db.query(CloudAccount.name)
         .join(InspectionResult, InspectionResult.account_id == CloudAccount.id)
@@ -138,7 +208,14 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
         .all()
     )
     account_names = [name for (name,) in account_rows]
-    return success_response(data=_serialize_task(task, account_names))
+    try:
+        cids = json.loads(task.customer_ids) if task.customer_ids else []
+    except (TypeError, json.JSONDecodeError):
+        cids = []
+    return success_response(data=_serialize_task(
+        task, account_names, cids, _customer_names(db, cids)
+    ))
+
 
 @router.get("/results")
 def list_results(
@@ -147,6 +224,7 @@ def list_results(
     resource_type: Optional[str] = None,
     is_abnormal: Optional[bool] = None,
     status: Optional[str] = None,
+    customer_id: Optional[int] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
@@ -156,6 +234,16 @@ def list_results(
         query = query.filter(InspectionResult.task_id == task_id)
     if account_id is not None:
         query = query.filter(InspectionResult.account_id == account_id)
+    if customer_id is not None:
+        customer_account_ids = [
+            row[0] for row in
+            db.query(CloudAccount.id).filter(CloudAccount.customer_id == customer_id).all()
+        ]
+        query = query.filter(
+            InspectionResult.account_id.in_(customer_account_ids)
+            if customer_account_ids
+            else False
+        )
     if resource_type is not None:
         query = query.filter(InspectionResult.resource_type == resource_type)
     if is_abnormal is not None:
@@ -194,6 +282,7 @@ def list_results(
 
     pages = (total + page_size - 1) // page_size
     return success_response(data={"items": items, "total": total, "page": page, "page_size": page_size, "pages": pages})
+
 
 @router.get("/results/export")
 def export_results(task_id: Optional[int] = None, output_format: str = Query("excel", alias="format"), db: Session = Depends(get_db)):

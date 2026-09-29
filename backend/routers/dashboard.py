@@ -48,6 +48,7 @@ def get_abnormal_resources(
     limit: int = Query(10, ge=1, le=100),
     account_id: Optional[int] = None,
     task_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     if task_id:
@@ -63,6 +64,16 @@ def get_abnormal_resources(
     )
     if account_id is not None:
         query = query.filter(InspectionResult.account_id == account_id)
+    if customer_id is not None:
+        customer_account_ids = [
+            row[0] for row in
+            db.query(CloudAccount.id).filter(CloudAccount.customer_id == customer_id).all()
+        ]
+        query = query.filter(
+            InspectionResult.account_id.in_(customer_account_ids)
+            if customer_account_ids
+            else False
+        )
     results = query.limit(limit).all()
 
     items = []

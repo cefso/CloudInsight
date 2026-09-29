@@ -9,6 +9,7 @@ class CloudAccountCreate(BaseModel):
     access_key_secret: str = Field(..., min_length=1)
     regions: Optional[list[str]] = None
     resource_types: Optional[list[str]] = None
+    customer_id: Optional[int] = None
 
 
 class CloudAccountUpdate(BaseModel):
@@ -17,6 +18,7 @@ class CloudAccountUpdate(BaseModel):
     access_key_secret: Optional[str] = None
     regions: Optional[list[str]] = None
     resource_types: Optional[list[str]] = None
+    customer_id: Optional[int] = None
     is_enabled: Optional[bool] = None
 
 

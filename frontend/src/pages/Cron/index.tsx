@@ -3,12 +3,14 @@ import { Card, Table, Button, Space, Modal, Form, Input, Switch, message, Popcon
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getCronConfigs, createCronConfig, updateCronConfig, deleteCronConfig } from '../../api/inspections';
 import { getAccounts } from '../../api/accounts';
-import type { CronConfig, CloudAccount } from '../../types';
+import { getCustomers } from '../../api/customers';
+import type { CronConfig, CloudAccount, Customer } from '../../types';
 import PageHeader from '../../components/PageHeader';
 
 export default function Cron() {
   const [configs, setConfigs] = useState<CronConfig[]>([]);
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -24,9 +26,14 @@ export default function Cron() {
     try { setAccounts(await getAccounts()); } catch { /* ignore */ }
   };
 
+  const fetchCustomers = async () => {
+    try { setCustomers(await getCustomers()); } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     fetchConfigs();
     fetchAccounts();
+    fetchCustomers();
   }, []);
 
   const handleCreate = async () => {
@@ -79,13 +86,18 @@ export default function Cron() {
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="任务名称" rules={[{ required: true }]}><Input placeholder="如：每日巡检" /></Form.Item>
           <Form.Item name="cron_expression" label="Cron 表达式" rules={[{ required: true }]}><Input placeholder="如：0 8 * * * (每天8点)" /></Form.Item>
+          <Form.Item name="customer_ids" label="适用客户" tooltip="运行时按客户当前启用账号动态展开，新增账号会自动纳入">
+            <Select mode="multiple" placeholder="可选，按客户批量巡检" allowClear
+              options={customers.map(c => ({ label: c.name, value: c.id }))} />
+          </Form.Item>
           <Form.Item name="account_ids" label="适用账号">
-            <Select mode="multiple" placeholder="留空则巡检所有账号" allowClear
+            <Select mode="multiple" placeholder="可与客户叠加；都留空则巡检所有账号" allowClear
               options={accounts.map(a => ({ label: a.name, value: a.id }))} />
           </Form.Item>
         </Form>
         <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 12, marginTop: 8 }}>
-          Cron 格式: 分 时 日 月 周。示例: 0 8 * * * (每天8点), 0 */2 * * * (每2小时)
+          Cron 格式: 分 时 日 月 周。示例: 0 8 * * * (每天8点), 0 */2 * * * (每2小时)。
+          客户与账号取并集，都为空时巡检全部启用账号。
         </p>
       </Modal>
     </div>
