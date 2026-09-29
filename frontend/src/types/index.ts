@@ -1,3 +1,16 @@
+// 客户
+export interface Customer {
+  id: number;
+  name: string;
+  contact: string | null;
+  phone: string | null;
+  remark: string | null;
+  created_at: string;
+  updated_at: string;
+  account_count: number;
+  account_names: string[];
+}
+
 // 云账号
 export interface CloudAccount {
   id: number;
@@ -5,6 +18,8 @@ export interface CloudAccount {
   access_key_id: string;
   regions: string[] | null;
   resource_types: string[] | null;
+  customer_id: number | null;
+  customer_name: string | null;
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -23,6 +38,8 @@ export interface InspectionTask {
   abnormal_count: number;
   error_message: string | null;
   account_names?: string[];
+  customer_ids?: number[];
+  customer_names?: string[];
 }
 
 // 巡检结果
@@ -93,6 +110,8 @@ export interface CronConfig {
   cron_expression: string;
   account_ids: number[];
   account_names: string[];
+  customer_ids: number[];
+  customer_names: string[];
   is_enabled: boolean;
   last_run_at: string | null;
   next_run_at: string | null;
@@ -172,4 +191,3 @@ export interface AiStreamEvent {
   data?: Record<string, unknown>;
   report_id?: number;
 }
-

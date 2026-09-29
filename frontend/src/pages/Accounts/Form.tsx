@@ -57,6 +57,7 @@ export default function AccountForm({ visible, onClose, onSuccess, initialValues
       const values = await form.validateFields();
       setLoading(true);
       if (isEdit) {
+        // 清空客户下拉时显式传 null，保证后端解除归属
         await updateAccount(initialValues.id, values);
         message.success('更新成功');
       } else {

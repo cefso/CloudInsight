@@ -52,7 +52,8 @@ class InspectionEngine:
     def __init__(self, db: Session):
         self.db = db
 
-    def run_inspection(self, account_ids: Optional[list[int]] = None, trigger_type: str = "manual", task_id: Optional[int] = None) -> InspectionTask:
+    def run_inspection(self, account_ids: Optional[list[int]] = None, trigger_type: str = "manual", task_id: Optional[int] = None, customer_ids: Optional[list[int]] = None) -> InspectionTask:
+        import json
         if task_id:
             task = self.db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
             if not task:
@@ -61,17 +62,19 @@ class InspectionEngine:
             task = InspectionTask(
                 trigger_type=trigger_type,
                 status="running",
-                started_at=datetime.now(timezone.utc)
+                started_at=datetime.now(timezone.utc),
+                customer_ids=json.dumps(customer_ids) if customer_ids else None,
             )
             self.db.add(task)
             self.db.commit()
             self.db.refresh(task)
 
         try:
-            if account_ids:
+            # account_ids is None 表示全部启用账号；[] 表示目标为空，不得回退成全量
+            if account_ids is not None:
                 accounts = self.db.query(CloudAccount).filter(
                     CloudAccount.id.in_(account_ids), CloudAccount.is_enabled.is_(True)
-                ).all()
+                ).all() if account_ids else []
             else:
                 accounts = self.db.query(CloudAccount).filter(CloudAccount.is_enabled.is_(True)).all()
 

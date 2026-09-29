@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getInspectionTasks } from '../../api/inspections';
 import { getAccounts } from '../../api/accounts';
-import type { InspectionTaskWithAccounts, CloudAccount } from '../../types';
+import { getCustomers } from '../../api/customers';
+import type { InspectionTaskWithAccounts, CloudAccount, Customer } from '../../types';
 import PageHeader from '../../components/PageHeader';
 import StatusTag from '../../components/StatusTag';
 
@@ -17,15 +18,18 @@ export default function Inspections() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [filterTrigger, setFilterTrigger] = useState<string | undefined>(undefined);
   const [filterAccount, setFilterAccount] = useState<number | undefined>(undefined);
+  const [filterCustomer, setFilterCustomer] = useState<number | undefined>(undefined);
 
   const fetchTasks = async (p: number, ps: number) => {
     setLoading(true);
     try {
-      const filters: { trigger_type?: string; account_id?: number } = {};
+      const filters: { trigger_type?: string; account_id?: number; customer_id?: number } = {};
       if (filterTrigger) filters.trigger_type = filterTrigger;
       if (filterAccount) filters.account_id = filterAccount;
+      if (filterCustomer) filters.customer_id = filterCustomer;
       const data = await getInspectionTasks(p, ps, filters);
       setTasks((data.items || []) as InspectionTaskWithAccounts[]);
       setTotal(data.total);
@@ -37,14 +41,19 @@ export default function Inspections() {
     try { setAccounts(await getAccounts()); } catch { /* ignore */ }
   };
 
+  const fetchCustomers = async () => {
+    try { setCustomers(await getCustomers()); } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     fetchAccounts();
+    fetchCustomers();
   }, []);
 
   useEffect(() => {
     setPage(1);
     fetchTasks(1, pageSize);
-  }, [filterTrigger, filterAccount]);
+  }, [filterTrigger, filterAccount, filterCustomer]);
 
   const handlePageChange = (p: number, ps: number) => {
     setPage(p);
@@ -76,6 +85,8 @@ export default function Inspections() {
           <Space>
             <Select allowClear placeholder="触发方式" style={{ width: 120 }} value={filterTrigger} onChange={setFilterTrigger}
               options={[{ label: '手动', value: 'manual' }, { label: '定时', value: 'cron' }]} />
+            <Select allowClear placeholder="筛选客户" style={{ width: 160 }} value={filterCustomer} onChange={setFilterCustomer}
+              options={customers.map(c => ({ label: c.name, value: c.id }))} />
             <Select allowClear placeholder="筛选账号" style={{ width: 160 }} value={filterAccount} onChange={setFilterAccount}
               options={accounts.map(a => ({ label: a.name, value: a.id }))} />
           </Space>

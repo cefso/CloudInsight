@@ -5,8 +5,9 @@ import dayjs from 'dayjs';
 import { getDashboardStats, getAbnormalResources } from '../../api/dashboard';
 import { triggerInspection, getInspectionTasks } from '../../api/inspections';
 import { getAccounts } from '../../api/accounts';
+import { getCustomers } from '../../api/customers';
 import type { AbnormalResource } from '../../api/dashboard';
-import type { DashboardStats, CloudAccount, InspectionTask } from '../../types';
+import type { DashboardStats, CloudAccount, Customer, InspectionTask } from '../../types';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -14,9 +15,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [accounts, setAccounts] = useState<CloudAccount[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<number[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [filterAccountId, setFilterAccountId] = useState<number | undefined>(undefined);
+  const [filterCustomerId, setFilterCustomerId] = useState<number | undefined>(undefined);
   const [tasks, setTasks] = useState<InspectionTask[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<number | undefined>(undefined);
 
@@ -27,10 +31,10 @@ export default function Dashboard() {
     } catch { message.error('获取统计数据失败'); }
   };
 
-  const fetchAbnormalResources = async (accountId?: number, taskId?: number) => {
+  const fetchAbnormalResources = async (accountId?: number, taskId?: number, customerId?: number) => {
     setLoading(true);
     try {
-      const data = await getAbnormalResources(10, accountId, taskId);
+      const data = await getAbnormalResources(10, accountId, taskId, customerId);
       setAbnormalResources(data);
     } catch { message.error('获取异常资源失败'); }
     finally { setLoading(false); }
@@ -38,6 +42,10 @@ export default function Dashboard() {
 
   const fetchAccounts = async () => {
     try { setAccounts(await getAccounts()); } catch { /* ignore */ }
+  };
+
+  const fetchCustomers = async () => {
+    try { setCustomers(await getCustomers()); } catch { /* ignore */ }
   };
 
   const fetchTasks = async () => {
@@ -61,29 +69,52 @@ export default function Dashboard() {
   useEffect(() => {
     fetchTasks();
     fetchAccounts();
+    fetchCustomers();
   }, []);
 
   useEffect(() => {
     fetchStats(selectedTaskId);
-    fetchAbnormalResources(filterAccountId, selectedTaskId);
-  }, [selectedTaskId, filterAccountId]);
+    fetchAbnormalResources(filterAccountId, selectedTaskId, filterCustomerId);
+  }, [selectedTaskId, filterAccountId, filterCustomerId]);
 
   const getAccountName = (id: number) => accounts.find(a => a.id === id)?.name || `账号${id}`;
 
   const handleTriggerClick = () => {
     if (accounts.length === 0) { message.warning('请先配置云账号'); return; }
+    setSelectedCustomerIds([]);
     setSelectedAccountIds([]);
     setShowAccountModal(true);
   };
 
+  const applyCustomerSelection = (customerIds: number[]) => {
+    setSelectedCustomerIds(customerIds);
+    if (customerIds.length === 0) {
+      setSelectedAccountIds([]);
+      return;
+    }
+    const expanded = accounts
+      .filter((a) => a.customer_id != null && customerIds.includes(a.customer_id) && a.is_enabled)
+      .map((a) => a.id);
+    setSelectedAccountIds(expanded);
+  };
+
   const handleTriggerConfirm = async () => {
-    if (selectedAccountIds.length === 0) { message.warning('请选择要巡检的账号'); return; }
+    if (selectedCustomerIds.length === 0 && selectedAccountIds.length === 0) {
+      message.warning('请选择客户或云账号');
+      return;
+    }
+    if (selectedAccountIds.length === 0) {
+      message.warning('所选客户下没有可用云账号');
+      return;
+    }
     setShowAccountModal(false);
     setTriggering(true);
     try {
-      await triggerInspection(selectedAccountIds);
+      await triggerInspection({
+        account_ids: selectedAccountIds,
+        customer_ids: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
+      });
       message.success('巡检任务已提交，请稍后刷新查看结果');
-      // 刷新任务列表
       setTimeout(() => fetchTasks(), 2000);
     } catch { message.error('触发巡检失败'); }
     finally { setTriggering(false); }
@@ -91,7 +122,7 @@ export default function Dashboard() {
 
   const handleRefresh = () => {
     fetchStats(selectedTaskId);
-    fetchAbnormalResources(filterAccountId, selectedTaskId);
+    fetchAbnormalResources(filterAccountId, selectedTaskId, filterCustomerId);
   };
 
   const columns = [
@@ -137,36 +168,66 @@ export default function Dashboard() {
       </Row>
       <Card title="异常资源列表" loading={loading}
         extra={
-          <Select
-            allowClear
-            placeholder="按账号筛选"
-            style={{ width: 200 }}
-            value={filterAccountId}
-            onChange={setFilterAccountId}
-            options={accounts.map(a => ({ label: a.name, value: a.id }))}
-          />
+          <Space>
+            <Select
+              allowClear
+              placeholder="按客户筛选"
+              style={{ width: 160 }}
+              value={filterCustomerId}
+              onChange={setFilterCustomerId}
+              options={customers.map(c => ({ label: c.name, value: c.id }))}
+            />
+            <Select
+              allowClear
+              placeholder="按账号筛选"
+              style={{ width: 200 }}
+              value={filterAccountId}
+              onChange={setFilterAccountId}
+              options={accounts.map(a => ({ label: a.name, value: a.id }))}
+            />
+          </Space>
         }
       >
         <Table columns={columns} dataSource={abnormalResources} rowKey="id" pagination={false} />
       </Card>
 
       <Modal
-        title="选择巡检账号"
+        title="选择巡检范围"
         open={showAccountModal}
         onOk={handleTriggerConfirm}
         onCancel={() => setShowAccountModal(false)}
         okText="开始巡检"
         cancelText="取消"
       >
-        <p style={{ marginBottom: 16 }}>请选择要巡检的云账号：</p>
-        <Select
-          mode="multiple"
-          style={{ width: '100%' }}
-          placeholder="选择账号"
-          value={selectedAccountIds}
-          onChange={setSelectedAccountIds}
-          options={accounts.map(a => ({ label: `${a.name} (${a.access_key_id.length > 10 ? a.access_key_id.slice(-4) : a.access_key_id})`, value: a.id }))}
-        />
+        <p style={{ marginBottom: 12 }}>优先按客户选择，会自动勾选其下启用中的云账号，也可再手动增减：</p>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 6, fontWeight: 600 }}>客户</div>
+          <Select
+            mode="multiple"
+            style={{ width: '100%' }}
+            placeholder="选择客户（自动勾选其下启用账号）"
+            value={selectedCustomerIds}
+            onChange={applyCustomerSelection}
+            options={customers.map(c => ({
+              label: `${c.name}（${c.account_count} 个账号）`,
+              value: c.id,
+            }))}
+          />
+        </div>
+        <div>
+          <div style={{ marginBottom: 6, fontWeight: 600 }}>云账号（可增减）</div>
+          <Select
+            mode="multiple"
+            style={{ width: '100%' }}
+            placeholder="选择账号"
+            value={selectedAccountIds}
+            onChange={setSelectedAccountIds}
+            options={accounts.map(a => ({
+              label: `${a.name}${a.customer_name ? ` · ${a.customer_name}` : ''} (${a.access_key_id.length > 10 ? a.access_key_id.slice(-4) : a.access_key_id})`,
+              value: a.id,
+            }))}
+          />
+        </div>
       </Modal>
     </div>
   );

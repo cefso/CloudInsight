@@ -11,6 +11,7 @@ export async function createAccount(params: {
   access_key_secret: string;
   regions?: string[];
   resource_types?: string[];
+  customer_id?: number | null;
 }): Promise<{ id: number }> {
   return await api.post('/accounts', params);
 }
@@ -21,6 +22,7 @@ export async function updateAccount(id: number, params: Partial<{
   access_key_secret: string;
   regions: string[];
   resource_types: string[];
+  customer_id: number | null;
   is_enabled: boolean;
 }>): Promise<void> {
   await api.put(`/accounts/${id}`, params);

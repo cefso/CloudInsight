@@ -19,3 +19,4 @@ class InspectionTask(Base):
     warning_count = Column(Integer, default=0)
     abnormal_count = Column(Integer, default=0)
     error_message = Column(Text)
+    customer_ids = Column(Text, comment="触发时客户ID JSON数组快照")

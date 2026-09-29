@@ -10,6 +10,7 @@ class CronConfig(Base):
     name = Column(String(100), nullable=False)
     cron_expression = Column(String(50), nullable=False)
     account_ids = Column(Text, comment="适用账号ID JSON数组，为空则所有账号")
+    customer_ids = Column(Text, comment="适用客户ID JSON数组，运行时动态展开")
     is_enabled = Column(Boolean, default=True)
     last_run_at = Column(DateTime)
     next_run_at = Column(DateTime)

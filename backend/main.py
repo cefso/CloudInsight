@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 import logging
 from config import get_settings
 from database import init_db
-from models import CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig, AiConfig, AiReport, AiConversation  # noqa: F401 — 触发 SQLAlchemy 模型注册
-from routers import accounts, inspections, thresholds, cron, dashboard, ai
+from models import Customer, CloudAccount, AlertThreshold, InspectionTask, InspectionResult, CronConfig, AiConfig, AiReport, AiConversation  # noqa: F401 — 触发 SQLAlchemy 模型注册
+from routers import accounts, customers, inspections, thresholds, cron, dashboard, ai
 from services.scheduler import task_scheduler
 from services.mcp_manager import mcp_manager
 
@@ -56,6 +56,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+app.include_router(customers.router)
 app.include_router(accounts.router)
 app.include_router(inspections.router)
 app.include_router(thresholds.router)

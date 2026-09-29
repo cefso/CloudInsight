@@ -1,3 +1,4 @@
+from schemas.customer import CustomerCreate, CustomerUpdate
 from schemas.cloud_account import (
     CloudAccountCreate,
     CloudAccountUpdate,
@@ -12,6 +13,8 @@ from schemas.inspection import (
 )
 
 __all__ = [
+    "CustomerCreate",
+    "CustomerUpdate",
     "CloudAccountCreate",
     "CloudAccountUpdate",
     "TestConnectionRequest",

@@ -20,9 +20,10 @@ export async function getDashboardStats(taskId?: number): Promise<DashboardStats
   return await api.get('/dashboard/stats', { params });
 }
 
-export async function getAbnormalResources(limit = 10, accountId?: number, taskId?: number): Promise<AbnormalResource[]> {
+export async function getAbnormalResources(limit = 10, accountId?: number, taskId?: number, customerId?: number): Promise<AbnormalResource[]> {
   const params: Record<string, number> = { limit };
   if (accountId) params.account_id = accountId;
   if (taskId) params.task_id = taskId;
+  if (customerId) params.customer_id = customerId;
   return await api.get('/dashboard/abnormal-resources', { params });
 }

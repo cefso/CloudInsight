@@ -94,6 +94,12 @@ export default function Accounts() {
       },
     },
     {
+      title: '归属客户',
+      dataIndex: 'customer_name',
+      key: 'customer',
+      render: (n: string | null) => (n ? <Tag color="geekblue">{n}</Tag> : <Tag>未归属</Tag>),
+    },
+    {
       title: '状态',
       dataIndex: 'is_enabled',
       key: 'enabled',
@@ -127,7 +133,7 @@ export default function Accounts() {
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>云账号管理</h1>
           <p style={{ color: 'var(--ant-color-text-secondary)', margin: '4px 0 0 0' }}>
-            管理阿里云账号凭证，支持多账号配置
+            管理阿里云账号凭证，支持多账号配置，可归属客户便于批量巡检
           </p>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingAccount(null); setFormVisible(true); }}>
